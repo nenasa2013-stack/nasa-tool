@@ -30,7 +30,7 @@ CODE_FILES = [
 
 
 def fetch(rel):
-    url = "https://raw.githubusercontent.com/%s/%s/%s/nasa/%s" % (
+    url = "https://raw.githubusercontent.com/%s/%s/%s/%s" % (
         GITHUB_USER, REPO, BRANCH, rel.replace("\\", "/"))
     dst = os.path.join(HERE, rel)
     d = os.path.dirname(dst)
