@@ -2690,8 +2690,12 @@ _MT_LIST_JS = r"""(() => {
 
 
 _MT_DISMISS_JS = r"""([pt]) => {
-  // Diem [x,y] giua nut that dang bi overlay (modal fixed) che: tim nut tat THAT
-  // trong overlay de click trusted, khong co thi bao ESC. Trung nut that -> null.
+  // Diem [x,y] giua nut that dang bi che:
+  // - Trung nut that -> null.
+  // - Modal THAT (div.fixed/[role=dialog]/*modal*/*overlay*/*backdrop*/*popup*,
+  //   hoac rect phu gan full viewport) -> tag nut tat that -> 'close', khong co -> 'esc'.
+  // - Phan tu thuong (sticky header...) che -> 'recenter' (scroll nut ra giua man hinh).
+  //   CAM tag svg lung tung (vd nut theme-toggle trong header).
   const x = pt[0], y = pt[1];
   let el = null;
   try { el = document.elementFromPoint(x, y); } catch (e) { el = null; }
@@ -2702,11 +2706,19 @@ _MT_DISMISS_JS = r"""([pt]) => {
   } catch (e) {}
   let ov = null;
   try {
-    ov = (el.closest && el.closest('div.fixed, [role="dialog"], [class*="modal"], [class*="overlay"], [class*="backdrop"], [class*="popup"]')) || el;
-  } catch (e) { ov = el; }
+    ov = el.closest && el.closest('div.fixed, [role="dialog"], [class*="modal"], [class*="overlay"], [class*="backdrop"], [class*="popup"]');
+  } catch (e) { ov = null; }
+  let fullCover = false;
+  try {
+    const er = el.getBoundingClientRect();
+    const vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+    fullCover = er && er.width >= vw * 0.7 && er.height >= vh * 0.4;
+  } catch (e) {}
+  if (!ov && !fullCover) return JSON.stringify({action: 'recenter'});
+  const scope = ov || el;
   const btns = [];
   try {
-    for (const c of Array.from((ov || document).querySelectorAll('button, [role="button"], a'))) {
+    for (const c of Array.from(scope.querySelectorAll('button, [role="button"], a'))) {
       if (c.hasAttribute && (c.hasAttribute('data-honeypot') || c.hasAttribute('data-decoy') ||
           c.hasAttribute('data-decoy-role') || c.getAttribute('aria-hidden') === 'true')) continue;
       btns.push(c);
@@ -2721,22 +2733,39 @@ _MT_DISMISS_JS = r"""([pt]) => {
       return JSON.stringify({action: 'close'});
     }
   }
-  for (const c of btns) {
-    let t = '';
-    try { t = ((c.innerText || c.textContent || '') + '').trim(); } catch (e) {}
-    if (!t && c.querySelector && c.querySelector('svg,path')) {
-      try { c.dataset.mtClose = '1'; } catch (e) {}
-      return JSON.stringify({action: 'close'});
+  // Nut X chi icon (svg): CHI khi scope la modal that, tranh tag nut theme header.
+  if (ov) {
+    for (const c of btns) {
+      let t = '';
+      try { t = ((c.innerText || c.textContent || '') + '').trim(); } catch (e) {}
+      if (!t && c.querySelector && c.querySelector('svg,path')) {
+        try { c.dataset.mtClose = '1'; } catch (e) {}
+        return JSON.stringify({action: 'close'});
+      }
     }
   }
   return JSON.stringify({action: 'esc'});
 }"""
 
 
+def _mt_scroll_center(page, loc):
+    """Scroll nut ra GIUA viewport (tranh sticky header de len nut sau scroll)."""
+    try:
+        loc.evaluate("(el) => { try { el.scrollIntoView({block: 'center', inline: 'center'}); } catch (e) {} }")
+        return True
+    except Exception:
+        pass
+    try:
+        loc.scroll_into_view_if_needed(timeout=5000)
+        return True
+    except Exception:
+        return False
+
+
 def _mt_trusted_click(page, loc, timeout=15000):
     """Re chuot Bezier (nguoi) + click trusted cua Playwright (isTrusted=true)."""
     loc.wait_for(state="visible", timeout=10000)
-    loc.scroll_into_view_if_needed(timeout=5000)
+    _mt_scroll_center(page, loc)
     try:
         bb = loc.bounding_box(timeout=5000)
     except Exception:
@@ -2747,8 +2776,8 @@ def _mt_trusted_click(page, loc, timeout=15000):
 
 
 def _mt_dismiss_overlay(page, loc):
-    """Neu overlay che nut that: tag nut tat that (data-mt-close) roi click trusted,
-    hoac phim ESC (trusted). Tra True neu da xu ly (cho retry), False neu khong co overlay."""
+    """Neu co gi che nut that: modal -> tag nut tat that roi click trusted / ESC;
+    header/thuong -> scroll nut ra giua (recenter). Tra True neu da xu ly (cho retry)."""
     try:
         bb = loc.bounding_box(timeout=3000)
     except Exception:
@@ -2772,6 +2801,9 @@ def _mt_dismiss_overlay(page, loc):
             page.keyboard.press("Escape")
         except Exception:
             pass
+        return True
+    if act == "recenter":
+        _mt_scroll_center(page, loc)
         return True
     return False
 
