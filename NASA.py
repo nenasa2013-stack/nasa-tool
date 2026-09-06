@@ -1857,6 +1857,16 @@ except NameError:
     def log_step(n, m=""):
         print_info(f"[{n}] {m}" if m else f"[{n}]")
 
+_BAD_KEY_UNTIL = {}
+
+
+def _key_cooldown(k):
+    try:
+        return time.time() < _BAD_KEY_UNTIL.get(k or "", 0)
+    except Exception:
+        return False
+
+
 def get_proxy_with_api_fallback(slot=1):
     if FORCE_DIRECT:
         return ""
@@ -1872,12 +1882,26 @@ def get_proxy_with_api_fallback(slot=1):
     if ACTIVE_KEY_XOAY_VIP and ACTIVE_KEY_XOAY_VIP not in [c[0] for c in cands]:
         cands.append((ACTIVE_KEY_XOAY_VIP, ACTIVE_PROVIDER_VIP))
     for _k, _pr in cands:
+        if _key_cooldown(_k):
+            continue  # key vua loi (sai/het han) -> di Direct, khong spam API
         p = get_rotating_key_proxy_vip(_k, provider=_pr, rotate=False)
         if p:
+            try:
+                _BAD_KEY_UNTIL.pop(_k, None)
+            except Exception:
+                pass
             return p
         p2 = get_rotating_key_proxy_vip(_k, provider=_pr, rotate=True)
         if p2:
+            try:
+                _BAD_KEY_UNTIL.pop(_k, None)
+            except Exception:
+                pass
             return p2
+        try:
+            _BAD_KEY_UNTIL[_k] = time.time() + 300
+        except Exception:
+            pass
     return ""
 
 

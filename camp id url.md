@@ -282,7 +282,7 @@ sc8|https://sc88okvip.store
 
 95-2|https://keonhacai.recipes
 
-94-2|https://3ogame.io
+94-2|https://nubeton.nl
 
 90-2|https://koone.io
 
