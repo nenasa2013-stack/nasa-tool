@@ -3046,21 +3046,25 @@ def moneytask_auto_fetch_octo(auto=None):
         last_err = ""
         try:
             loc = page.locator("[data-mt-idx='%d']" % idx)
+            dismissed = 0
             for _ in range(4):
                 try:
                     _mt_trusted_click(page, loc, timeout=8000)
                     clicked = True
                     break
                 except Exception as e:
-                    last_err = str(e)[:120]
-                    if "intercepts pointer events" in str(e) and _mt_dismiss_overlay(page, loc):
+                    last_err = str(e)
+                    # Moi loi click deu thu dismiss 1 lan (overlay co the hien dang khac)
+                    if dismissed < 2 and _mt_dismiss_overlay(page, loc):
+                        dismissed += 1
+                        print_slot_info(0, f"Da tat overlay lan {dismissed}, click lai nut [{idx+1}]...")
                         page.wait_for_timeout(800)
                         continue
                     break
         except Exception as e:
-            last_err = str(e)[:120]
+            last_err = str(e)
         if not clicked:
-            print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (khong JS click de giu bypass): {last_err}")
+            print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (khong JS click de giu bypass): {last_err[:2000]}")
             print_slot_warning(0, "Khong bam duoc nut Nhan nhiem vu.")
             return ""
 
