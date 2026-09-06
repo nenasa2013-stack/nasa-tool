@@ -2793,6 +2793,15 @@ def is_proxy_level_err(e):
     return any(x.lower() in el for x in _PROXY_LEVEL_MARKS)
 
 
+def _mt_auto_pick(tasks):
+    """Auto mode chon nhiem vu so 2 (index 1); chi 0-1 task thi chon 0."""
+    try:
+        n = len(tasks or [])
+    except Exception:
+        return 0
+    return 1 if n > 1 else 0
+
+
 def moneytask_auto_fetch_octo(auto=None):
     """Tu dong lay url octolink nhiem vu tu MoneyTask. Tra ve shortenedUrl hoac ''."""
     cookie_str = _mt_load_cookie()
@@ -2928,8 +2937,8 @@ def moneytask_auto_fetch_octo(auto=None):
         if auto is None:
             auto = mt_auto_enabled()
         if auto:
-            idx = 0
-            print_slot_info(0, f"Tu chon [1] {tasks[0].get('text','')} (auto) -> bam Nhan nhiem vu...")
+            idx = _mt_auto_pick(tasks)
+            print_slot_info(0, f"Tu chon [{idx+1}] {tasks[idx].get('text','')} (auto) -> bam Nhan nhiem vu...")
         else:
             sys.stdout.write(f"  {ColorCyan2}{Bold}>> Chon nhiem vu [1-{min(len(tasks),20)}] (Enter = 1): {Reset}")
             sys.stdout.flush()
