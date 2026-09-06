@@ -2592,16 +2592,44 @@ def _mt_load_cookie():
         return v
 
 
-def _mt_save_cookie(v):
+def _mt_cache_cookie(v):
+    """Chi nap RAM (khong ghi file) - file chi ghi sau khi cookie chay duoc."""
     v = (v or "").strip()
     with _mt_cookie_lock:
         _mt_cookie_cache["value"] = v
         _mt_cookie_cache["loaded"] = True
+
+
+def _mt_save_cookie(v):
+    v = (v or "").strip()
+    _mt_cache_cookie(v)
     try:
         with open(resolve_path(MT_COOKIE_FILE), "w", encoding="utf-8") as f:
             f.write(v)
     except Exception:
         pass
+
+
+def _mt_jwt_exp(cookie_str):
+    """Doc han exp tu JWT token= trong cookie (khong verify). Tra timestamp hoac None."""
+    try:
+        for part in (cookie_str or "").split(";"):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            k, v = part.split("=", 1)
+            if k.strip().lower() != "token":
+                continue
+            segs = v.strip().split(".")
+            if len(segs) != 3:
+                return None
+            import base64 as _b64
+            pay = segs[1] + "=" * (-len(segs[1]) % 4)
+            data = json.loads(_b64.urlsafe_b64decode(pay).decode("utf-8", "ignore"))
+            exp = int(data.get("exp") or 0)
+            return exp or None
+    except Exception:
+        return None
 
 
 def _mt_parse_cookie(s):
@@ -2636,8 +2664,7 @@ def _mt_prompt_cookie(saved):
         return saved
     if "token=" not in text:
         print_slot_warning(0, "Cookie dan vao thieu token=... co the het han, van thu.")
-    _mt_save_cookie(text)
-    print_slot_success(0, f"Da luu cookie ({len(text)} ky tu) vao {MT_COOKIE_FILE}.")
+    # KHONG luu o day - chi luu sau khi cookie chay duoc (thay task list)
     return text
 
 
@@ -3007,20 +3034,31 @@ def _mt_auto_pick(tasks):
 def moneytask_auto_fetch_octo(auto=None):
     """Tu dong lay url octolink nhiem vu tu MoneyTask. Tra ve shortenedUrl hoac ''."""
     cookie_str = _mt_load_cookie()
+    if cookie_str:
+        exp = _mt_jwt_exp(cookie_str)
+        if exp and exp < time.time():
+            try:
+                exp_s = time.strftime("%H:%M %d/%m", time.localtime(exp))
+            except Exception:
+                exp_s = str(exp)
+            print_slot_warning(0, f"Cookie luu da het han tu {exp_s} -> can dan moi (file cu giu nguyen).")
+            cookie_str = ""
+        else:
+            print_slot_info(0, f"Dung cookie MoneyTask da luu ({len(cookie_str)} ky tu). Go 'mtc' o prompt de doi cookie.")
     if not cookie_str:
         cookie_str = _mt_prompt_cookie("")
         if not cookie_str:
             print_slot_warning(0, "Chua co cookie MoneyTask -> bo qua.")
             return ""
-    else:
-        print_slot_info(0, f"Dung cookie MoneyTask da luu ({len(cookie_str)} ky tu). Go 'mtc' o prompt de doi cookie.")
+        _mt_cache_cookie(cookie_str)
     cookies = _mt_parse_cookie(cookie_str)
     if not cookies:
-        print_slot_warning(0, "Cookie khong parse duoc (can dang a=b; c=d). Dan lai.")
-        _mt_save_cookie("")
-        with _mt_cookie_lock:
-            _mt_cookie_cache["loaded"] = False
-        return ""
+        print_slot_warning(0, "Cookie khong parse duoc (can dang a=b; c=d). Dan lai (file cu giu nguyen).")
+        cookie_str = _mt_prompt_cookie(cookie_str)
+        cookies = _mt_parse_cookie(cookie_str)
+        if not cookies:
+            return ""
+        _mt_cache_cookie(cookie_str)
 
     print_slot_info(0, "Mo MoneyTask nhu trinh duyet that (UA Chrome/152 + cookie that, page tu handshake pubcrypto)...")
     pw = None
@@ -3079,13 +3117,11 @@ def moneytask_auto_fetch_octo(auto=None):
         except Exception:
             cur, body_txt = "", ""
         if "dang-nhap" in cur or "login" in cur or "Đăng nhập" in body_txt:
-            print_slot_warning(0, "Cookie het han (trang doi ve login). Dan lai cookie moi.")
-            _mt_save_cookie("")
-            with _mt_cookie_lock:
-                _mt_cookie_cache["loaded"] = False
+            print_slot_warning(0, "Cookie het han (trang doi ve login). Dan cookie moi (file cu giu nguyen).")
             cookie_str = _mt_prompt_cookie("")
             if not cookie_str:
                 return ""
+            _mt_cache_cookie(cookie_str)
             try:
                 ctx.add_cookies(_mt_parse_cookie(cookie_str))
                 page.goto(MT_TASKS_URL, wait_until="domcontentloaded", timeout=60000)
@@ -3156,6 +3192,13 @@ def moneytask_auto_fetch_octo(auto=None):
         if not tasks:
             print_slot_warning(0, "Khong thay nut Nhan nhiem vu nao (co the het task hoac bi chan).")
             return ""
+
+        # Cookie chay duoc (thay task) -> moi luu, lan sau khoi dan lai
+        try:
+            _mt_save_cookie(cookie_str)
+            print_slot_success(0, f"Da luu cookie ({len(cookie_str)} ky tu) vao {MT_COOKIE_FILE}.")
+        except Exception:
+            pass
 
         print_slot_success(0, f"Thay {len(tasks)} nhiem vu MoneyTask:")
         for i, t in enumerate(tasks[:20], 1):
@@ -3411,10 +3454,7 @@ def moneytask_auto_claim(finish_url, slot_id=0):
         except Exception:
             cur, txt = "", ""
         if "dang-nhap" in cur or "login" in cur or "Đăng nhập" in txt:
-            print_slot_warning(slot_id, "Cookie het han (finish doi ve login). Dan lai cookie moi.")
-            _mt_save_cookie("")
-            with _mt_cookie_lock:
-                _mt_cookie_cache["loaded"] = False
+            print_slot_warning(slot_id, "Cookie het han (finish doi ve login). Go 'mt' dan lai cookie moi (file cu giu nguyen).")
             return False
 
         # Doi qua endTime (neu co tu accept) roi moi bam -> tranh CALLBACK_TOO_FAST +60
