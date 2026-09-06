@@ -2699,10 +2699,12 @@ _MT_DISMISS_JS = r"""([pt]) => {
   const x = pt[0], y = pt[1];
   let el = null;
   try { el = document.elementFromPoint(x, y); } catch (e) { el = null; }
-  if (!el) return JSON.stringify({action: null});
+  const out = {action: null, info: '', bx: 0, by: 0};
+  const done = () => JSON.stringify(out);
+  if (!el) return done();
   try {
     if ((el.hasAttribute && el.hasAttribute('data-mt-idx')) ||
-        (el.closest && el.closest('[data-mt-idx]'))) return JSON.stringify({action: null});
+        (el.closest && el.closest('[data-mt-idx]'))) return done();
   } catch (e) {}
   let ov = null;
   try {
@@ -2714,8 +2716,15 @@ _MT_DISMISS_JS = r"""([pt]) => {
     const vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
     fullCover = er && er.width >= vw * 0.7 && er.height >= vh * 0.4;
   } catch (e) {}
-  if (!ov && !fullCover) return JSON.stringify({action: 'recenter'});
+  if (!ov && !fullCover) { out.action = 'recenter'; return done(); }
   const scope = ov || el;
+  try { out.info = ((scope.className || '') + '|' + (scope.getAttribute('role') || '')).slice(0, 120); } catch (e) {}
+  // Diem backdrop: ria trai overlay (vung dem p-4, ngoai dialog giua) de click tat modal.
+  try {
+    const r = scope.getBoundingClientRect();
+    out.bx = Math.max(4, r.left + 8);
+    out.by = Math.max(4, r.top + Math.min(r.height / 2, 160));
+  } catch (e) {}
   const btns = [];
   try {
     for (const c of Array.from(scope.querySelectorAll('button, [role="button"], a'))) {
@@ -2724,13 +2733,13 @@ _MT_DISMISS_JS = r"""([pt]) => {
       btns.push(c);
     }
   } catch (e) {}
-  const CLOSE_RE = /đóng|dong|close|hủy|huy|cancel|bỏ qua|bo qua|đồng ý|dong y|^x$|×|thử lại|thu lai/i;
+  const CLOSE_RE = /đóng|dong|close|hủy|huy|cancel|bỏ qua|bo qua|đồng ý|dong y|^x$|×|thử lại|thu lai|để sau|de sau|tắt|tat/i;
   for (const c of btns) {
     let t = '';
     try { t = ((c.innerText || c.textContent || c.getAttribute('aria-label') || '') + '').trim(); } catch (e) {}
     if (t && CLOSE_RE.test(t)) {
       try { c.dataset.mtClose = '1'; } catch (e) {}
-      return JSON.stringify({action: 'close'});
+      out.action = 'close'; out.info += ' -> nut "' + t.slice(0, 30) + '"'; return done();
     }
   }
   // Nut X chi icon (svg): CHI khi scope la modal that, tranh tag nut theme header.
@@ -2740,11 +2749,12 @@ _MT_DISMISS_JS = r"""([pt]) => {
       try { t = ((c.innerText || c.textContent || '') + '').trim(); } catch (e) {}
       if (!t && c.querySelector && c.querySelector('svg,path')) {
         try { c.dataset.mtClose = '1'; } catch (e) {}
-        return JSON.stringify({action: 'close'});
+        out.action = 'close'; out.info += ' -> nut X icon'; return done();
       }
     }
   }
-  return JSON.stringify({action: 'esc'});
+  out.action = 'esc';
+  return done();
 }"""
 
 
@@ -2776,36 +2786,49 @@ def _mt_trusted_click(page, loc, timeout=15000):
 
 
 def _mt_dismiss_overlay(page, loc):
-    """Neu co gi che nut that: modal -> tag nut tat that roi click trusted / ESC;
-    header/thuong -> scroll nut ra giua (recenter). Tra True neu da xu ly (cho retry)."""
+    """Neu co gi che nut that: modal -> nut tat that (trusted) / ESC / click backdrop (trusted);
+    header/thuong -> recenter. Tra (handled, detail) de log."""
     try:
         bb = loc.bounding_box(timeout=3000)
     except Exception:
-        return False
+        return False, "no bbox"
     if not bb:
-        return False
+        return False, "no bbox"
     cx, cy = bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2
     try:
         raw = page.evaluate(_MT_DISMISS_JS, [cx, cy]) or '{"action": null}'
-        act = (json.loads(raw) or {}).get("action")
-    except Exception:
-        return False
+        res = json.loads(raw) or {}
+        act = res.get("action")
+    except Exception as e:
+        return False, f"evaluate loi: {e}"[:100]
+    info = str(res.get("info", ""))[:120]
     if act == "close":
         try:
             _mt_trusted_click(page, page.locator("[data-mt-close='1']"), timeout=8000)
-        except Exception:
-            pass
-        return True
+            return True, f"close {info}"
+        except Exception as e:
+            return True, f"close loi {e}"[:100]
     if act == "esc":
         try:
             page.keyboard.press("Escape")
         except Exception:
             pass
-        return True
+        try:
+            bx, by = float(res.get("bx") or 0), float(res.get("by") or 0)
+        except Exception:
+            bx, by = 0, 0
+        if bx > 0 and by > 0:
+            try:
+                _mt_human_move(page, bx, by)
+                page.mouse.click(bx, by)
+                return True, f"esc + backdrop ({int(bx)},{int(by)}) {info}"
+            except Exception:
+                pass
+        return True, f"esc {info}"
     if act == "recenter":
         _mt_scroll_center(page, loc)
-        return True
-    return False
+        return True, "recenter"
+    return False, "trung nut that/khong overlay"
 
 
 # ============================================================================
@@ -3082,23 +3105,31 @@ def moneytask_auto_fetch_octo(auto=None):
         try:
             loc = page.locator("[data-mt-idx='%d']" % idx)
             dismissed = 0
-            for _ in range(4):
+            for _ in range(5):
                 try:
                     _mt_trusted_click(page, loc, timeout=8000)
                     clicked = True
                     break
                 except Exception as e:
                     last_err = str(e)
-                    # Moi loi click deu thu dismiss 1 lan (overlay co the hien dang khac)
-                    if dismissed < 2 and _mt_dismiss_overlay(page, loc):
-                        dismissed += 1
-                        print_slot_info(0, f"Da tat overlay lan {dismissed}, click lai nut [{idx+1}]...")
-                        page.wait_for_timeout(800)
-                        continue
+                    # Moi loi click deu thu dismiss (overlay co the hien dang khac)
+                    if dismissed < 3:
+                        ok, detail = _mt_dismiss_overlay(page, loc)
+                        if ok:
+                            dismissed += 1
+                            print_slot_info(0, f"Dismiss lan {dismissed} [{detail}], click lai nut [{idx+1}]...")
+                            page.wait_for_timeout(800)
+                            continue
                     break
         except Exception as e:
             last_err = str(e)
         if not clicked:
+            try:
+                shot = os.path.join(LOG_DIR, f"mt_blocked_{time.strftime('%H%M%S')}.png")
+                page.screenshot(path=shot)
+                print_slot_warning(0, f"Da chup man hinh modal che nut: {shot} (gui file nay de xem)")
+            except Exception:
+                pass
             print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (khong JS click de giu bypass): {last_err[:2000]}")
             print_slot_warning(0, "Khong bam duoc nut Nhan nhiem vu.")
             return ""
