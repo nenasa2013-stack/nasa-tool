@@ -2689,6 +2689,93 @@ _MT_LIST_JS = r"""(() => {
 })();"""
 
 
+_MT_DISMISS_JS = r"""([pt]) => {
+  // Diem [x,y] giua nut that dang bi overlay (modal fixed) che: tim nut tat THAT
+  // trong overlay de click trusted, khong co thi bao ESC. Trung nut that -> null.
+  const x = pt[0], y = pt[1];
+  let el = null;
+  try { el = document.elementFromPoint(x, y); } catch (e) { el = null; }
+  if (!el) return JSON.stringify({action: null});
+  try {
+    if ((el.hasAttribute && el.hasAttribute('data-mt-idx')) ||
+        (el.closest && el.closest('[data-mt-idx]'))) return JSON.stringify({action: null});
+  } catch (e) {}
+  let ov = null;
+  try {
+    ov = (el.closest && el.closest('div.fixed, [role="dialog"], [class*="modal"], [class*="overlay"], [class*="backdrop"], [class*="popup"]')) || el;
+  } catch (e) { ov = el; }
+  const btns = [];
+  try {
+    for (const c of Array.from((ov || document).querySelectorAll('button, [role="button"], a'))) {
+      if (c.hasAttribute && (c.hasAttribute('data-honeypot') || c.hasAttribute('data-decoy') ||
+          c.hasAttribute('data-decoy-role') || c.getAttribute('aria-hidden') === 'true')) continue;
+      btns.push(c);
+    }
+  } catch (e) {}
+  const CLOSE_RE = /đóng|dong|close|hủy|huy|cancel|bỏ qua|bo qua|đồng ý|dong y|^x$|×|thử lại|thu lai/i;
+  for (const c of btns) {
+    let t = '';
+    try { t = ((c.innerText || c.textContent || c.getAttribute('aria-label') || '') + '').trim(); } catch (e) {}
+    if (t && CLOSE_RE.test(t)) {
+      try { c.dataset.mtClose = '1'; } catch (e) {}
+      return JSON.stringify({action: 'close'});
+    }
+  }
+  for (const c of btns) {
+    let t = '';
+    try { t = ((c.innerText || c.textContent || '') + '').trim(); } catch (e) {}
+    if (!t && c.querySelector && c.querySelector('svg,path')) {
+      try { c.dataset.mtClose = '1'; } catch (e) {}
+      return JSON.stringify({action: 'close'});
+    }
+  }
+  return JSON.stringify({action: 'esc'});
+}"""
+
+
+def _mt_trusted_click(page, loc, timeout=15000):
+    """Re chuot Bezier (nguoi) + click trusted cua Playwright (isTrusted=true)."""
+    loc.wait_for(state="visible", timeout=10000)
+    loc.scroll_into_view_if_needed(timeout=5000)
+    try:
+        bb = loc.bounding_box(timeout=5000)
+    except Exception:
+        bb = None
+    if bb:
+        _mt_human_move(page, bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2)
+    loc.click(timeout=timeout)
+
+
+def _mt_dismiss_overlay(page, loc):
+    """Neu overlay che nut that: tag nut tat that (data-mt-close) roi click trusted,
+    hoac phim ESC (trusted). Tra True neu da xu ly (cho retry), False neu khong co overlay."""
+    try:
+        bb = loc.bounding_box(timeout=3000)
+    except Exception:
+        return False
+    if not bb:
+        return False
+    cx, cy = bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2
+    try:
+        raw = page.evaluate(_MT_DISMISS_JS, [cx, cy]) or '{"action": null}'
+        act = (json.loads(raw) or {}).get("action")
+    except Exception:
+        return False
+    if act == "close":
+        try:
+            _mt_trusted_click(page, page.locator("[data-mt-close='1']"), timeout=8000)
+        except Exception:
+            pass
+        return True
+    if act == "esc":
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+        return True
+    return False
+
+
 # ============================================================================
 # MT AUTO LOOP (cookie 1 lan -> tu mt -> tu chon 1; blacklist 5x/xoay proxy;
 # id chi so-so; demo -> goi lai link gan nhat; finish xong tu mt tiep)
@@ -2952,27 +3039,28 @@ def moneytask_auto_fetch_octo(auto=None):
 
         # Click trusted qua Playwright (khong dung JS click de tranh isTrusted=false)
         # Nut MoneyTask ghi "Thuc Hien" (khong chi "Nhan") -> match rong
-        # Re chuot trusted truoc click de Lu() thay pathLinearity/speedVar/pauseCount nguoi
-        def _mt_move_to(lc):
-            try:
-                bb = lc.bounding_box(timeout=5000)
-            except Exception:
-                bb = None
-            if bb:
-                _mt_human_move(page, bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2)
         # Click TRUSTED vao nut THAT da tag data-mt-idx (khong do text de tranh moi).
         # CAM JS .click(): isTrusted=false -> an flag programmatic_clicks (dump anti-cheat B2).
+        # Modal overlay che nut -> tat modal that / ESC (van trusted) roi click lai.
         clicked = False
+        last_err = ""
         try:
             loc = page.locator("[data-mt-idx='%d']" % idx)
-            loc.wait_for(state="visible", timeout=10000)
-            loc.scroll_into_view_if_needed(timeout=5000)
-            _mt_move_to(loc)
-            loc.click(timeout=15000)
-            clicked = True
+            for _ in range(4):
+                try:
+                    _mt_trusted_click(page, loc, timeout=8000)
+                    clicked = True
+                    break
+                except Exception as e:
+                    last_err = str(e)[:120]
+                    if "intercepts pointer events" in str(e) and _mt_dismiss_overlay(page, loc):
+                        page.wait_for_timeout(800)
+                        continue
+                    break
         except Exception as e:
-            print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (bo qua, khong JS click de giu bypass): {e}")
+            last_err = str(e)[:120]
         if not clicked:
+            print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (khong JS click de giu bypass): {last_err}")
             print_slot_warning(0, "Khong bam duoc nut Nhan nhiem vu.")
             return ""
 
