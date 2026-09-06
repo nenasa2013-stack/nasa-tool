@@ -2542,7 +2542,8 @@ MT_COOKIE_FILE = "moneytask_cookie.txt"
 MT_REAL_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36")
 MT_SEC_CH_UA = '"Chromium";v="152", "Not?A_Brand";v="24", "Google Chrome";v="152"'
-# Nut chap nhan nhiem vu MoneyTask: chu "Thuc Hien" (khong chi "Nhan")
+# DEPRECATED: nut that la canvas (khong chu) -> do text se vo trung honeypot.
+# Giu hang so cho tuong thich; list/click that dung _MT_LIST_JS + [data-mt-idx].
 MT_ACCEPT_RE = re.compile("Nhận|Nhận nhiệm vụ|Thực Hiện|Thực hiện|thuc hien|Accept|làm nhiệm vụ|lam nhiem vu", re.I)
 MT_ACCEPT_JS_RE = "nhận|nhan|accept|thực hiện|thuc hien|làm nhiệm vụ|lam nhiem vu"
 
@@ -2617,31 +2618,72 @@ def _mt_prompt_cookie(saved):
 
 
 _MT_LIST_JS = r"""(() => {
+  // Chi liet ke NUT THAT: div[role=button] chua canvas + nam TRONG viewport.
+  // LOAI honeypot/decoy: [data-honeypot] [data-decoy] [data-decoy-role] [data-hpx*]
+  // [data-autoclick] [data-auto-clicker] aria-hidden=true display:none off-screen.
+  // (Nut that khong co chu - la canvas - nen do text se vo trung moi.)
   const out = [];
   const seen = new Set();
-  const btns = Array.from(document.querySelectorAll('button, a[role="button"], input[type="button"], input[type="submit"]'));
-  for (const b of btns) {
-    let t = ((b.innerText || b.textContent || b.value || '') + '').trim().replace(/\s+/g, ' ');
-    if (!t) continue;
-    if (!/nhận|nhan|accept|làm nhiệm vụ|lam nhiem vu|thực hiện|thuc hien/i.test(t)) continue;
-    // Tim card chua nut roi uu tien heading/title (khac chu nut) lam ten task
-    let name = '';
-    const card = (b.closest && b.closest('[class*="card"],[class*="task"],[class*="job"],[class*="item"],li,tr,[role="row"]')) || b.parentElement;
-    if (card) {
-      const heads = Array.from(card.querySelectorAll('h1,h2,h3,h4,h5,h6,[class*="title"],[class*="name"]'));
-      for (const h of heads) {
-        const ht = ((h.innerText || h.textContent || '') + '').trim().replace(/\s+/g, ' ');
-        if (ht && ht.length > 1 && ht.length < 120 && ht.toLowerCase() !== t.toLowerCase()) { name = ht.slice(0, 90); break; }
+  const hasBadAttr = (el) => {
+    try {
+      const names = el.getAttributeNames ? el.getAttributeNames() : [];
+      for (const a of names) {
+        const al = (a + '').toLowerCase();
+        if (al === 'data-honeypot' || al === 'data-decoy' || al === 'data-decoy-role' ||
+            al === 'data-autoclick' || al === 'data-auto-clicker' || al.indexOf('data-hpx') === 0) return true;
       }
-      if (!name) {
-        const lines = ((card.innerText || card.textContent || '') + '').split('\n').map(s => s.trim()).filter(s => s && s !== t && s.length > 1 && s.length < 120);
-        if (lines.length) name = lines[0].slice(0, 90);
+    } catch (e) {}
+    return false;
+  };
+  const isHidden = (el) => {
+    try {
+      const cs = window.getComputedStyle(el);
+      if (cs && (cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse')) return true;
+    } catch (e) {}
+    try { if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true; } catch (e) {}
+    return false;
+  };
+  const inViewport = (el) => {
+    try {
+      const r = el.getBoundingClientRect();
+      if (!r || r.width <= 0 || r.height <= 0) return false;
+      const vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+      return r.bottom > 0 && r.right > 0 && r.left < vw && r.top < vh && r.left >= -2 && r.top >= -2;
+    } catch (e) { return false; }
+  };
+  const cands = Array.from(document.querySelectorAll('div[role="button"], button, a[role="button"], input[type="button"], input[type="submit"]'));
+  for (const b of cands) {
+    if (hasBadAttr(b) || isHidden(b)) continue;
+    if (!inViewport(b)) continue;
+    const hasCanvas = !!(b.querySelector && b.querySelector('canvas'));
+    let t = ((b.getAttribute && b.getAttribute('aria-label')) || b.innerText || b.textContent || b.value || '').trim().replace(/\s+/g, ' ');
+    let name = '';
+    const alm = t.match(/^(thuc hien nhiem vu|bam de thuc hien|th\u1ef1c hi\u1ec7n nhi\u1ec7m v\u1ee5|b\u1ea5m \u0111\u1ec3 th\u1ef1c hi\u1ec7n)\s+(.+)$/i);
+    if (alm && alm[2]) name = alm[2].trim();
+    if (!hasCanvas) {
+      if (!/nh\u1eadn|nhan|accept|l\u00e0m nhi\u1ec7m v\u1ee5|lam nhiem vu|th\u1ef1c hi\u1ec7n|thuc hien/i.test(t)) continue;
+    }
+    if (!name) {
+      const card = (b.closest && b.closest('[class*="card"],[class*="task"],[class*="job"],[class*="item"],li,tr,[role="row"]')) || b.parentElement;
+      if (card) {
+        const heads = Array.from(card.querySelectorAll('h1,h2,h3,h4,h5,h6,[class*="title"],[class*="name"]'));
+        for (const h of heads) {
+          const ht = ((h.innerText || h.textContent || '') + '').trim().replace(/\s+/g, ' ');
+          if (ht && ht.length > 1 && ht.length < 120 && ht.toLowerCase() !== t.toLowerCase()) { name = ht.slice(0, 90); break; }
+        }
+        if (!name) {
+          const lines = ((card.innerText || card.textContent || '') + '').split('\n').map(s => s.trim()).filter(s => s && s !== t && s.length > 1 && s.length < 120);
+          if (lines.length) name = lines[0].slice(0, 90);
+        }
       }
     }
-    const key = t.slice(0, 40) + '|' + name.slice(0, 40);
+    if (!name) name = t.slice(0, 90);
+    if (!name) continue;
+    const key = name.slice(0, 40);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({text: t.slice(0, 40), name: name, visible: b.offsetParent !== null});
+    try { b.dataset.mtIdx = String(out.length); } catch (e) {}
+    out.push({text: (hasCanvas ? 'Bam thuc hien' : t.slice(0, 40)), name: name.slice(0, 90), visible: true});
   }
   return JSON.stringify(out);
 })();"""
@@ -2909,32 +2951,18 @@ def moneytask_auto_fetch_octo(auto=None):
                 bb = None
             if bb:
                 _mt_human_move(page, bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2)
+        # Click TRUSTED vao nut THAT da tag data-mt-idx (khong do text de tranh moi).
+        # CAM JS .click(): isTrusted=false -> an flag programmatic_clicks (dump anti-cheat B2).
         clicked = False
         try:
-            loc = page.locator("button", has_text=MT_ACCEPT_RE).nth(idx)
+            loc = page.locator("[data-mt-idx='%d']" % idx)
             loc.wait_for(state="visible", timeout=10000)
             loc.scroll_into_view_if_needed(timeout=5000)
             _mt_move_to(loc)
             loc.click(timeout=15000)
             clicked = True
-        except Exception:
-            try:
-                loc2 = page.locator("a", has_text=MT_ACCEPT_RE).nth(idx)
-                loc2.wait_for(state="visible", timeout=10000)
-                loc2.scroll_into_view_if_needed(timeout=5000)
-                _mt_move_to(loc2)
-                loc2.click(timeout=15000)
-                clicked = True
-            except Exception as e:
-                print_slot_warning(0, f"Khong click duoc nut (thu JS click): {e}")
-                try:
-                    page.evaluate(
-                        "(() => { const btns = Array.from(document.querySelectorAll('button, a')); "
-                        "const f = btns.filter(b => /" + MT_ACCEPT_JS_RE + "/i.test((b.innerText||b.textContent||''))); "
-                        "if (f[" + str(idx) + "]) f[" + str(idx) + "].click(); })()")
-                    clicked = True
-                except Exception:
-                    pass
+        except Exception as e:
+            print_slot_warning(0, f"Khong click duoc nut that [{idx+1}] (bo qua, khong JS click de giu bypass): {e}")
         if not clicked:
             print_slot_warning(0, "Khong bam duoc nut Nhan nhiem vu.")
             return ""
