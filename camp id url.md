@@ -6,7 +6,7 @@
 
 229-2|socomcreative.co
 
-230-2|https://nuhunslot.fashion
+230-2|https://hitclub3000.com
 
 228-2|https://casinoonlinesicuri.club
 
@@ -18,9 +18,9 @@
 
 224-3|death19.com
 
-223-3|https://nuhunslot.fashion
+223-3|https://hitclub3000.com
 
-222-3|https://tokoslot77asli.fashion
+222-3|https://hitclub3000.com
 
 221-3|geno.my
 
@@ -102,7 +102,7 @@
 
 194-2|https://s8n8.top
 
-192-2|https://slotboomstucadoors.nl
+192-2|https://ltslot99.vip
 
 193-2|https://riobet-jan.homes
 
@@ -198,7 +198,7 @@
 
 141-2|https://www.slotolandia.co
 
-140-2|https://hukukcu.co
+140-2|https://rtprrslot88.co
 
 139-2|https://boostmyapp.top
 

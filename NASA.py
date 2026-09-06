@@ -1858,6 +1858,29 @@ except NameError:
         print_info(f"[{n}] {m}" if m else f"[{n}]")
 
 _BAD_KEY_UNTIL = {}
+_FORCE_ROTATE = set()
+
+
+def force_slot_rotate(slot_id=1):
+    """Bat lan fetch proxy ke tiep cua slot phai xoay IP moi (rotate=True truoc)."""
+    try:
+        _FORCE_ROTATE.add(slot_key_no(slot_id))
+    except Exception:
+        pass
+
+
+def _take_force_rotate(slot_id=1):
+    try:
+        n = slot_key_no(slot_id)
+    except Exception:
+        n = 1
+    if n in _FORCE_ROTATE:
+        try:
+            _FORCE_ROTATE.discard(n)
+        except Exception:
+            pass
+        return True
+    return False
 
 
 def _key_cooldown(k):
@@ -1881,9 +1904,18 @@ def get_proxy_with_api_fallback(slot=1):
             cands.append((_k, _pr))
     if ACTIVE_KEY_XOAY_VIP and ACTIVE_KEY_XOAY_VIP not in [c[0] for c in cands]:
         cands.append((ACTIVE_KEY_XOAY_VIP, ACTIVE_PROVIDER_VIP))
+    force = _take_force_rotate(slot)
     for _k, _pr in cands:
         if _key_cooldown(_k):
             continue  # key vua loi (sai/het han) -> di Direct, khong spam API
+        if force:
+            p = get_rotating_key_proxy_vip(_k, provider=_pr, rotate=True)
+            if p:
+                try:
+                    _BAD_KEY_UNTIL.pop(_k, None)
+                except Exception:
+                    pass
+                return p
         p = get_rotating_key_proxy_vip(_k, provider=_pr, rotate=False)
         if p:
             try:
@@ -3017,6 +3049,15 @@ _PROXY_LEVEL_MARKS = ["proxy", "tunnel", "ERR_PROXY", "ERR_TUNNEL", "connection 
 def is_proxy_level_err(e):
     el = (e or "").lower()
     return any(x.lower() in el for x in _PROXY_LEVEL_MARKS)
+
+
+# Session chet (server tra demo/khong hop le) -> job cu chet roi nen DUOC xoay IP
+# + mo cong lai tu dau. Timeout thong thuong (het han continue...) thi VAN GIU IP.
+_SESSION_DEAD_MARKS = ["mã hóa demo", "Session không hợp lệ"]
+
+
+def is_session_dead_err(e):
+    return any(x in (e or "") for x in _SESSION_DEAD_MARKS)
 
 
 def _mt_auto_pick(tasks):
@@ -4676,7 +4717,8 @@ class JobRunner:
             except Exception:
                 pass
             rotate_slot_key(slot_id)
-            print_slot_warning(slot_id, f"⛔ Nhiệm vụ [{task_key}] khớp mã camp lỗi [{black_token}] trong {BlacklistCampsFileName} -> Tự động bỏ qua ngay!")
+            force_slot_rotate(slot_id)
+            print_slot_warning(slot_id, f"⛔ Nhiệm vụ [{task_key}] khớp mã camp lỗi [{black_token}] trong {BlacklistCampsFileName} -> Tự động bỏ qua + xoay IP mới cho link tiếp theo!")
             return "", False, f"camp [{task_key}] nằm trong danh sách đen ({black_token})"
 
         # 2.1 Skip cooldown
@@ -5007,13 +5049,15 @@ class BridgeHandler(BaseHTTPRequestHandler):
                             task_url = rec
                             print_slot_warning(slot_id, f"🔄 Demo/session/timeout -> dùng lại link octo gần nhất (lần {attempt+1}/{max_att})...")
                     print_slot_warning(slot_id, f"🔄 Lỗi retryable ({err[:60]}...) -> Thử lại {attempt+1}/{max_att} (giữ IP) cho {task_url[:40]}...")
-                    if proxy_url and is_proxy_level_err(err) and s.proxy_mgr:
+                    if proxy_url and (is_proxy_level_err(err) or is_session_dead_err(err)) and s.proxy_mgr:
                         try:
                             s.proxy_mgr.mark_proxy_failed(proxy_url)
                         except Exception:
                             pass
-                        # Chi xoay khi proxy chet; loi server da tra ve thi GIU IP keo mat job
+                        # Xoay khi proxy chet HOAC session chet (job cu chet roi);
+                        # loi server khac thi GIU IP keo mat job
                         rotate_slot_key(slot_id)
+                        force_slot_rotate(slot_id)
                         proxy_url = get_proxy_with_api_fallback(slot_id) or ""
                         if not proxy_url:
                             proxy_url = get_file_proxy(s.proxy_mgr, slot_id)
@@ -5482,12 +5526,13 @@ def main():
                         print_warning(f"🔄 Lỗi retryable ({run_err[:60]}...) -> Thử lại {attempt+1}/{max_att}...")
                 else:
                     print_warning(f"🔄 Lỗi retryable ({run_err[:60]}...) -> Thử lại {attempt+1}/{max_att} (giữ IP) cho link {clean_input[:40]}...")
-                if proxy_url and is_proxy_level_err(run_err):
+                if proxy_url and (is_proxy_level_err(run_err) or is_session_dead_err(run_err)):
                     try:
                         proxy_mgr.mark_proxy_failed(proxy_url)
                     except Exception:
                         pass
                     rotate_slot_key(1)
+                    force_slot_rotate(1)
                     proxy_url = get_proxy_with_api_fallback(1) or get_file_proxy(proxy_mgr, 1)
                 time.sleep(2)
                 continue

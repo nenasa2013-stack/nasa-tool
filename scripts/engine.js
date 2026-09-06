@@ -967,10 +967,12 @@
             return;
           }
           if (_0xmRD[1] === _0DEMO_RD) {
-            if (!_0xprimeTried) {
-              _0xprimeTried = true;
-              logG('Server trả mã hóa demo - thử lại sau 5s...', 'warn');
-              setTimeout(function () { loadJsC(_0xud, _0xsrc, _0xctx); }, 5000);
+            _0xprimeTried = (_0xprimeTried || 0) + 1;
+            if (_0xprimeTried <= 3) {
+              logG('Server trả mã hóa demo - làm mới phiên rồi thử lại sau 5s (lần ' + _0xprimeTried + '/3)...', 'warn');
+              _0reprimeGate(function () {
+                setTimeout(function () { loadJsC(_0xud, _0xsrc, _0xctx); }, 5000);
+              });
             } else {
               logG('Vẫn nhận mã hóa demo. Session không hợp lệ.', 'error');
             }
@@ -984,6 +986,26 @@
         onerror: function () { if (_0xsrc === 'cache') showM(); },
         ontimeout: function () { if (_0xsrc === 'cache') showM(); }
       });
+    }
+
+    // Lam moi cookie phien (POST /check/device) KHONG dieu huong - dung khi gap ma hoa demo.
+    function _0reprimeGate(_0cb) {
+      var _0done = function () { try { _0cb && _0cb(); } catch (e) {} };
+      try {
+        var _0parts = [];
+        try { _0parts = (location.pathname || '').split('/').filter(Boolean); } catch (e) {}
+        var _0al = _0parts.length ? _0parts[_0parts.length - 1].replace(/\.html?$/i, '') : '';
+        if (!_0al || _0al.indexOf('.') >= 0 || /^(statics|js|css|check|finish|links|forms|api|admin|login|register|modern_theme|images|wp-|favicon|robots)$/i.test(_0al)) { _0done(); return; }
+        _0GM({
+          method: 'POST', url: 'https://octolink.vip/check/device',
+          data: 'alias=' + encodeURIComponent(_0al) + '&dv=',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', origin: 'https://octolink.vip', referer: 'https://octolink.vip/' + _0al, 'user-agent': navigator.userAgent, accept: 'application/json, text/javascript, */*; q=0.01' },
+          timeout: 30000,
+          onload: function (_0r) { try { _0mergeCookies(_0r.responseHeaders); } catch (e) {} _0done(); },
+          onerror: function () { _0done(); },
+          ontimeout: function () { _0done(); }
+        });
+      } catch (e) { _0done(); }
     }
 
     function deviceBypass(_0alias) {
