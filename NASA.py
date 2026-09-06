@@ -2733,13 +2733,40 @@ _MT_DISMISS_JS = r"""([pt]) => {
       btns.push(c);
     }
   } catch (e) {}
+  // Modal quang cao tai hien: tick "Khong hien thi lai" TRUOC khi Dong de diet vinh vien.
+  const NOSHOW_RE = /không hiển thị lại|khong hien thi lai|không hiện|khong hien|don't show|do not show|2 ngày|2 ngay/i;
+  const tagNoshow = () => {
+    try {
+      const boxes = Array.from(scope.querySelectorAll('input[type="checkbox"]'));
+      for (const bx of boxes) {
+        let lab = '';
+        try {
+          const lb = bx.closest ? bx.closest('label') : null;
+          lab = ((lb && (lb.innerText || lb.textContent)) || bx.getAttribute('aria-label') || '') + '';
+        } catch (e) {}
+        if (lab && NOSHOW_RE.test(lab)) {
+          try { bx.dataset.mtCheck = '1'; } catch (e) {}
+          out.check = true;
+          return true;
+        }
+      }
+      // checkbox tran (khong label ro): chi 1 checkbox duy nhat trong modal thong bao
+      if (boxes.length === 1) {
+        try { boxes[0].dataset.mtCheck = '1'; } catch (e) {}
+        out.check = true;
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  };
   const CLOSE_RE = /đóng|dong|close|hủy|huy|cancel|bỏ qua|bo qua|đồng ý|dong y|^x$|×|thử lại|thu lai|để sau|de sau|tắt|tat/i;
   for (const c of btns) {
     let t = '';
     try { t = ((c.innerText || c.textContent || c.getAttribute('aria-label') || '') + '').trim(); } catch (e) {}
     if (t && CLOSE_RE.test(t)) {
       try { c.dataset.mtClose = '1'; } catch (e) {}
-      out.action = 'close'; out.info += ' -> nut "' + t.slice(0, 30) + '"'; return done();
+      tagNoshow();
+      out.action = 'close'; out.info += ' -> nut "' + t.slice(0, 30) + '"' + (out.check ? ' + tick khong-hien-lai' : ''); return done();
     }
   }
   // Nut X chi icon (svg): CHI khi scope la modal that, tranh tag nut theme header.
@@ -2803,6 +2830,12 @@ def _mt_dismiss_overlay(page, loc):
         return False, f"evaluate loi: {e}"[:100]
     info = str(res.get("info", ""))[:120]
     if act == "close":
+        if res.get("check"):
+            try:
+                _mt_trusted_click(page, page.locator("[data-mt-check='1']"), timeout=8000)
+                info += " [da tick khong-hien-lai]"
+            except Exception as e:
+                info += f" [tick loi {e}"[:60] + "]"
         try:
             _mt_trusted_click(page, page.locator("[data-mt-close='1']"), timeout=8000)
             return True, f"close {info}"
@@ -3036,6 +3069,31 @@ def moneytask_auto_fetch_octo(auto=None):
             except Exception as e:
                 print_slot_warning(0, f"Mo lai loi: {e}")
                 return ""
+
+        # Don modal thong bao ("Khong hien thi lai trong 2 ngay") ngay sau load de khoi che nut
+        try:
+            vw = page.evaluate("({w: window.innerWidth || 1920, h: window.innerHeight || 1080})") or {}
+            raw0 = page.evaluate(_MT_DISMISS_JS, [int(vw.get("w", 1920) / 2), int(vw.get("h", 1080) / 2)]) or "{}"
+            res0 = json.loads(raw0) or {}
+            if res0.get("action") == "close":
+                if res0.get("check"):
+                    try:
+                        _mt_trusted_click(page, page.locator("[data-mt-check='1']"), timeout=6000)
+                    except Exception:
+                        pass
+                try:
+                    _mt_trusted_click(page, page.locator("[data-mt-close='1']"), timeout=6000)
+                except Exception:
+                    pass
+                print_slot_info(0, "Da tat modal thong bao dau trang.")
+                page.wait_for_timeout(600)
+            elif res0.get("action") == "esc":
+                try:
+                    page.keyboard.press("Escape")
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # Doi list task hien ra (page tu GET /api/tasks + giai ma pubcrypto.cjk)
         tasks = []
