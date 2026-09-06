@@ -2913,12 +2913,15 @@ def is_proxy_level_err(e):
 
 
 def _mt_auto_pick(tasks):
-    """Auto mode chon nhiem vu so 2 (index 1); chi 0-1 task thi chon 0."""
+    """Auto mode: chon task Uptolink (4 steps) theo ten; khong thay thi chon 0."""
     try:
-        n = len(tasks or [])
+        for i, t in enumerate(tasks or []):
+            n = str((t or {}).get("name", "")) + " " + str((t or {}).get("text", ""))
+            if "uptolink" in n.lower():
+                return i
     except Exception:
-        return 0
-    return 1 if n > 1 else 0
+        pass
+    return 0
 
 
 def moneytask_auto_fetch_octo(auto=None):
