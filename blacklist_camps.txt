@@ -1,0 +1,7 @@
+# ========================================================
+# DANH SÁCH MÃ CAMP LỖI / BỎ QUA (BLACKLIST)
+# Phân tách bằng dấu phẩy, khoảng trắng hoặc mỗi dòng 1 mã
+# Tool tự động cập nhật ngay khi bạn sửa file mà không cần bật lại tool
+# Ví dụ: 999-9
+# ========================================================
+199-2, 237-2, 220-2, 106-2, https://sainathbooks.in/, https://myfirsthome.co.in/vi-vn/

@@ -1,0 +1,8 @@
+# ========================================================
+# DANH SACH PROXY (Moi dong 1 proxy)
+# Ho tro cac dinh dang:
+#   1. ip:port (Vi du: 123.45.67.89:8080)
+#   2. ip:port:user:pass (Vi du: 123.45.67.89:8080:admin:123456)
+#   3. http://user:pass@ip:port
+#   4. socks5://user:pass@ip:port
+# ========================================================

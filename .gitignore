@@ -1,0 +1,15 @@
+# Secret - KHONG DAY LEN GITHUB
+settings.json
+moneytask_cookie.txt
+moneytask_token.txt
+.octo_settings
+
+# Rac - khong can day
+__pycache__/
+*.pyc
+logs/
+*.log
+finish_idle_*.txt
+shuffled_array.json
+decoded_cache.json
+deobfuscated_output.js
