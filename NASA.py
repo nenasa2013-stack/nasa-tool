@@ -3165,19 +3165,30 @@ def moneytask_auto_fetch_octo(auto=None):
             dismissed = 0
             for _ in range(5):
                 try:
-                    _mt_trusted_click(page, loc, timeout=8000)
+                    if dismissed >= 2:
+                        # Modal cu hien theo chuot: dung focus + Enter that (trusted,
+                        # khong re chuot) de bam nut ma khong kich modal.
+                        loc.wait_for(state="visible", timeout=8000)
+                        _mt_scroll_center(page, loc)
+                        loc.focus(timeout=5000)
+                        page.keyboard.press("Enter")
+                        page.wait_for_timeout(1000)
+                    else:
+                        _mt_trusted_click(page, loc, timeout=8000)
                     clicked = True
                     break
                 except Exception as e:
                     last_err = str(e)
-                    # Moi loi click deu thu dismiss (overlay co the hien dang khac)
+                    # Moi loi click deu thu dismiss; LOG MOI KET QUA (ke ca that bai)
                     if dismissed < 3:
-                        ok, detail = _mt_dismiss_overlay(page, loc)
-                        if ok:
-                            dismissed += 1
-                            print_slot_info(0, f"Dismiss lan {dismissed} [{detail}], click lai nut [{idx+1}]...")
-                            page.wait_for_timeout(800)
-                            continue
+                        try:
+                            ok, detail = _mt_dismiss_overlay(page, loc)
+                        except Exception as de:
+                            ok, detail = False, f"dismiss crash: {de}"[:120]
+                        dismissed += 1
+                        print_slot_info(0, f"Dismiss lan {dismissed} [{'OK' if ok else 'FAIL'}: {detail}], thu lai nut [{idx+1}]...")
+                        page.wait_for_timeout(800)
+                        continue
                     break
         except Exception as e:
             last_err = str(e)
