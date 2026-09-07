@@ -854,7 +854,7 @@
           logG('✦ [' + (_0matched.name || '?') + '] Đã nhận diện domain: ' + _0web, 'success');
           loadJsC(_0web.startsWith('http') ? _0web : 'https://' + _0web, 'cache', null);
         } else {
-          logG('✦ Job không tồn tại trong API, kết nối GitHub cache...', 'warn');
+          logG('✦ Job không tồn tại trong API, tra map local...', 'warn');
           getCacheR(_0x54fa);
         }
       });
