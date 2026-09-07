@@ -2122,6 +2122,21 @@ def money_task_bearer():
                 return s
     except Exception:
         pass
+    # Fallback: JWT token= trong moneytask_cookie.txt user da dan (het han thi bo)
+    try:
+        c = _mt_load_cookie()
+        for part in (c or "").split(";"):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            k, vv = part.split("=", 1)
+            if k.strip().lower() == "token" and vv.strip():
+                exp = _mt_jwt_exp(c)
+                if exp and exp < time.time():
+                    break
+                return "Bearer " + vv.strip()
+    except Exception:
+        pass
     return defaultMoneyTaskBearer
 
 
