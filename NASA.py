@@ -3060,6 +3060,10 @@ def is_session_dead_err(e):
     return any(x in (e or "") for x in _SESSION_DEAD_MARKS)
 
 
+_MT_CF_MARKERS = ("cf-challenge", "turnstile", "just a moment", "verify you are human",
+                   "challenge-platform", "checking your browser", "attention required")
+
+
 def _mt_auto_pick(tasks):
     """Auto mode: chon task Uptolink (4 steps) theo ten; khong thay thi chon 0."""
     try:
@@ -3170,6 +3174,25 @@ def moneytask_auto_fetch_octo(auto=None):
             except Exception as e:
                 print_slot_warning(0, f"Mo lai loi: {e}")
                 return ""
+
+        # Chan doan: page dung o dau (CF challenge? login la? trang trang?) - chi log
+        try:
+            _d_url = page.url or ""
+            _d_title = ""
+            try:
+                _d_title = page.title() or ""
+            except Exception:
+                pass
+            _d_body = page.evaluate("document.body ? document.body.innerText.slice(0,300) : ''") or ""
+            _d_html = page.evaluate("document.documentElement ? document.documentElement.outerHTML.slice(0,3000) : ''") or ""
+            _d_hits = [m for m in _MT_CF_MARKERS if m in (_d_html + " " + _d_body).lower()]
+            print_slot_info(0, "[DIAG] url=" + _d_url[:100] + " | title=" + _d_title[:80] + " | body=" + str(len(_d_body)) + " chars | api_tasks=" + str(len(captured["tasks"])))
+            if _d_hits:
+                print_slot_warning(0, "[DIAG] Cloudflare markers: " + ", ".join(_d_hits))
+            if _d_body:
+                print_slot_info(0, "[DIAG] body: " + _d_body[:200])
+        except Exception as _de:
+            print_slot_warning(0, "DIAG loi: " + str(_de)[:120])
 
         # Don modal thong bao ("Khong hien thi lai trong 2 ngay") ngay sau load de khoi che nut
         try:
