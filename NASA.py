@@ -2594,6 +2594,32 @@ def prompt_manual_domain(slot_id, task_key, failed_domain="", guide_url=""):
 
 MT_TASKS_URL = "https://moneytask.top/app/tasks/link-rut-gon"
 MT_COOKIE_FILE = "moneytask_cookie.txt"
+MT_PROFILE_DIR = os.path.join(BASE_DIR, "mt_profile")
+
+
+def _mt_launch_ctx(pw, extra_args=None):
+    """Chromium PERSISTENT profile cho MoneyTask: giu cf_clearance sau khi giai tay 1 lan.
+    --view (VIEW_MODE) = mo Chrome that de user tick checkbox Cloudflare tay."""
+    args = ["--no-sandbox", "--disable-dev-shm-usage", "--mute-audio",
+            "--disable-blink-features=AutomationControlled",
+            "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+    for a in (extra_args or []):
+        if a not in args:
+            args.append(a)
+    try:
+        os.makedirs(MT_PROFILE_DIR, exist_ok=True)
+    except Exception:
+        pass
+    return pw.chromium.launch_persistent_context(
+        MT_PROFILE_DIR,
+        headless=not VIEW_MODE,
+        args=args,
+        user_agent=MT_REAL_UA,
+        viewport={"width": 1920, "height": 1080},
+        locale="vi-VN",
+        timezone_id="Asia/Ho_Chi_Minh",
+        ignore_https_errors=True,
+    )
 # UA that lay tu log trinh duyet that (Chrome 152 Win64) - khop sec-ch-ua
 MT_REAL_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36")
@@ -3108,21 +3134,12 @@ def moneytask_auto_fetch_octo(auto=None):
     print_slot_info(0, "Mo MoneyTask nhu trinh duyet that (UA Chrome/152 + cookie that, page tu handshake pubcrypto)...")
     pw = None
     browser = None
+    ctx = None
     try:
         pw = sync_playwright().start()
         # Direct (khong proxy) de tranh IP datacenter bi flag - giong bypass_list moneytask
-        browser = pw.chromium.launch(headless=True, args=[
-            "--no-sandbox", "--disable-dev-shm-usage", "--mute-audio",
-            "--disable-blink-features=AutomationControlled",
-            "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        ])
-        ctx = browser.new_context(
-            user_agent=MT_REAL_UA,
-            viewport={"width": 1920, "height": 1080},
-            locale="vi-VN",
-            timezone_id="Asia/Ho_Chi_Minh",
-            ignore_https_errors=True,
-        )
+        # Profile persistent mt_profile/ giu cf_clearance sau khi giai tay 1 lan (--view)
+        ctx = _mt_launch_ctx(pw)
         try:
             ctx.add_init_script(MT_STEALTH_JS)
         except Exception:
@@ -3188,7 +3205,18 @@ def moneytask_auto_fetch_octo(auto=None):
             _d_hits = [m for m in _MT_CF_MARKERS if m in (_d_html + " " + _d_body).lower()]
             print_slot_info(0, "[DIAG] url=" + _d_url[:100] + " | title=" + _d_title[:80] + " | body=" + str(len(_d_body)) + " chars | api_tasks=" + str(len(captured["tasks"])))
             if _d_hits:
-                print_slot_warning(0, "[DIAG] Cloudflare markers: " + ", ".join(_d_hits))
+                print_slot_warning(0, "[DIAG] Cloudflare markers: " + ", ".join(_d_hits) + " -> doi tu mo (20s)...")
+                for _ in range(20):
+                    page.wait_for_timeout(1000)
+                    try:
+                        _rh = page.evaluate("document.documentElement ? document.documentElement.outerHTML.slice(0,3000) : ''") or ""
+                    except Exception:
+                        break
+                    if not any(m in _rh.lower() for m in _MT_CF_MARKERS):
+                        print_slot_success(0, "[DIAG] Cloudflare tu mo, tiep tuc.")
+                        break
+                else:
+                    print_slot_warning(0, "Cloudflare bat xac thuc tay. Giai 1 lan: chay `python loader.py --view --threads 1`, go `mt`, tick checkbox Cloudflare; profile mt_profile/ se nho, lan sau headless qua thang.")
             if _d_body:
                 print_slot_info(0, "[DIAG] body: " + _d_body[:200])
         except Exception as _de:
@@ -3373,6 +3401,11 @@ def moneytask_auto_fetch_octo(auto=None):
         return ""
     finally:
         try:
+            if ctx:
+                ctx.close()
+        except Exception:
+            pass
+        try:
             if browser:
                 browser.close()
         except Exception:
@@ -3484,18 +3517,12 @@ def moneytask_auto_claim(finish_url, slot_id=0):
     print_slot_info(slot_id, f"🎯 [MT-CLAIM] Mở ẩn {finish_url[:70]}... bằng cookie đã lưu (Direct, không proxy)...")
     pw = None
     browser = None
+    ctx = None
     try:
         pw = sync_playwright().start()
         # KHONG truyen proxy=... -> Playwright direct; them --proxy-server=direct:// de chac chan
-        browser = pw.chromium.launch(headless=True, args=list(MT_CLAIM_CHROME_ARGS))
-        ctx = browser.new_context(
-            user_agent=MT_REAL_UA,
-            viewport={"width": 1920, "height": 1080},
-            locale="vi-VN",
-            timezone_id="Asia/Ho_Chi_Minh",
-            ignore_https_errors=True,
-            proxy=None,
-        )
+        # Chung profile persistent mt_profile/ voi mt fetch (giu cf_clearance)
+        ctx = _mt_launch_ctx(pw, extra_args=MT_CLAIM_CHROME_ARGS)
         try:
             ctx.add_init_script(MT_STEALTH_JS)
         except Exception:
@@ -3586,6 +3613,11 @@ def moneytask_auto_claim(finish_url, slot_id=0):
         print_slot_warning(slot_id, f"MoneyTask auto claim loi: {e}")
         return False
     finally:
+        try:
+            if ctx:
+                ctx.close()
+        except Exception:
+            pass
         try:
             if browser:
                 browser.close()
