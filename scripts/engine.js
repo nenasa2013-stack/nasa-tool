@@ -754,10 +754,10 @@
 
     // 5. Cổng kiểm tra thiết bị Octolink: KHONG tu POST dv='' (rong + khong RSA
     // nhu trang that = diem tin cay thap). De trang tu submit DeviceShield that,
-    // doi dieu huong; neu bi deny thi doc ma + ly do THAT tu DOM bao ve.
+    // DOI TOI KHI navigate sang linkhuongdan (moi co id nhiem vu) hoac deny.
+    // Khong gioi han thoi gian: dieu huong se huy watcher; deny thi doc ly do that.
     if (_0x74d2.includes('octolink.vip') && !_0x83c1.has('redirect_to_octo')) {
-      logG('Cổng Octolink: chờ trang tự xác thực thiết bị...', 'system');
-      var _0gateTries = 0;
+      logG('Cổng Octolink: chờ trang tự xác thực + điều hướng sang linkhuongdan...', 'system');
       var _0gateTimer = setInterval(function () {
         try {
           var _0denied = document.getElementById('gate-denied');
@@ -780,8 +780,6 @@
             return;
           }
         } catch (e) {}
-        _0gateTries++;
-        if (_0gateTries > 45) { try { clearInterval(_0gateTimer); } catch (e) {} }
       }, 2000);
       return;
     }
