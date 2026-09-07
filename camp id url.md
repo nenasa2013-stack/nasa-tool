@@ -166,7 +166,7 @@
 
 159-2|https://56win.bingo
 
-158-2|https://www.greenup.com.tw
+158-2|https://eatspot.co
 
 157-2|https://g-rafo.co.in
 
@@ -260,7 +260,7 @@ sc8|https://sc88okvip.store
 
 108-2|https://akkus.de.com
 
-107-2|https://kaohsiungworldtradecenter.tw
+107-2|https://sg77.my
 
 106-2|https://mixslotroket.vip
 
@@ -302,7 +302,7 @@ sc8|https://sc88okvip.store
 
 79-2|https://clgvlc.sa.com
 
-78-2|https://luck8.faith
+78-2|https://king888.uno
 
 77-2|https://startconference.co
 

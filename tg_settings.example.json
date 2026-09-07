@@ -1,0 +1,5 @@
+{
+    "bot_token": "DAN_TOKEN_BOTFATHER_VAO_DAY",
+    "allowed_ids": [123456789],
+    "bridge_port": 8080
+}

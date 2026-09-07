@@ -4984,6 +4984,9 @@ class BridgeState:
         self.max_concurrency = max(1, max_concurrency)
         self.proxy_mgr = proxy_mgr
         self.target_tasks = target_tasks
+        self.tg_mu = threading.Lock()
+        self.tg_inbox = []
+        self.tg_outbox = {}
         self.completed_tasks = 0
         self.slots = [False] * self.max_concurrency
         self.active_count = 0
@@ -5007,6 +5010,85 @@ class BridgeState:
 
 
 BRIDGE_STATE = None
+
+
+# ============================================================================
+# TELEGRAM RELAY (phone -> tool -> phone): inbox link + outbox Link Goc
+# tg_relay.py POST link vao, main loop lay ra xu ly, xong day ket qua ve.
+# ============================================================================
+def tg_push_inbox(chat_id, url):
+    try:
+        s = BRIDGE_STATE
+        u = (url or "").strip()
+        if not (u.lower().startswith("http://") or u.lower().startswith("https://")):
+            return False
+        if s is None:
+            return False
+        with s.tg_mu:
+            s.tg_inbox.append((int(chat_id), u))
+        return True
+    except Exception:
+        return False
+
+
+def tg_pop_inbox():
+    try:
+        s = BRIDGE_STATE
+        if s is None:
+            return None
+        with s.tg_mu:
+            if s.tg_inbox:
+                return s.tg_inbox.pop(0)
+        return None
+    except Exception:
+        return None
+
+
+def tg_push_result(chat_id, ok, link="", err=""):
+    try:
+        s = BRIDGE_STATE
+        if s is None:
+            return
+        with s.tg_mu:
+            s.tg_outbox.setdefault(int(chat_id), []).append(
+                {"ok": bool(ok), "link": link or "", "err": (err or "")[:300]})
+    except Exception:
+        pass
+
+
+def tg_pop_result(chat_id):
+    try:
+        s = BRIDGE_STATE
+        if s is None:
+            return None
+        with s.tg_mu:
+            q = s.tg_outbox.get(int(chat_id)) or []
+            if q:
+                return q.pop(0)
+        return None
+    except Exception:
+        return None
+
+
+def read_console_or_tg():
+    """Cho console HOAC link Telegram: tra (text, ok, chat_id|None)."""
+    while True:
+        try:
+            s = _stdin_queue.get_nowait()
+        except queue.Empty:
+            s = None
+        if s is not None:
+            if s == EOF_TOKEN:
+                return "", False, None
+            return s.strip(), True, None
+        if _stdin_eof:
+            return "", False, None
+        tg = tg_pop_inbox()
+        if tg:
+            cid, url = tg
+            print_slot_info(0, f"📩 Link tu Telegram: {url[:70]}...")
+            return url, True, cid
+        time.sleep(0.5)
 MONEYTASK_PAUSE_LOCK = threading.Lock()
 ACTIVE_MONEYTASK_JOBS = 0
 ACTIVE_KEY_XOAY_VIP = ""
@@ -5088,6 +5170,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
         path = self.path.split("?", 1)[0]
         if path == "/api/status":
             self.handle_status()
+        elif path == "/api/tg_result":
+            self.handle_tg_result()
         else:
             self.send_error(404)
 
@@ -5101,8 +5185,41 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self.handle_forward(relay_mode=False)
         elif path == "/api/relay":
             self.handle_forward(relay_mode=True)
+        elif path == "/api/tg_submit":
+            self.handle_tg_submit()
         else:
             self.send_error(404)
+
+    # ---- Telegram relay ----
+    def handle_tg_submit(self):
+        req = self._read_json()
+        if req is None:
+            self.send_error(400)
+            return
+        try:
+            cid = int(req.get("chat_id", 0) or 0)
+        except Exception:
+            cid = 0
+        url_str = str(req.get("url", "") or "")
+        if cid <= 0 or not tg_push_inbox(cid, url_str):
+            self.send_error(400, "bad chat_id/url")
+            return
+        respond_json(self, 200, {"ok": True})
+
+    def handle_tg_result(self):
+        try:
+            qs = parse_qs(urlparse(self.path).query)
+            cid = int((qs.get("chat_id") or ["0"])[0] or 0)
+        except Exception:
+            cid = 0
+        if cid <= 0:
+            self.send_error(400, "bad chat_id")
+            return
+        r = tg_pop_result(cid)
+        if r is None:
+            respond_json(self, 200, {"ok": True, "empty": True})
+        else:
+            respond_json(self, 200, {"ok": True, "empty": False, "result": r})
 
     def _read_json(self):
         try:
@@ -5598,12 +5715,13 @@ def main():
         sys.stdout.write(f"  {ColorT2}{Bold}>> Dán link nhiệm vụ {Reset}{ColorDarkGray}(gõ 'mt' lấy link MoneyTask, 'auto' bật/tắt tự động, 'exit' thoát): {Reset}")
         sys.stdout.flush()
 
+        tg_chat = None
         if pending_auto:
             task_input = pending_auto
             pending_auto = ""
             print_slot_info(0, f"Tự động tiếp tục với: {task_input[:70]}...")
         else:
-            raw_input, ok = read_line_eof()
+            raw_input, ok, tg_chat = read_console_or_tg()
             if not ok:
                 print_session_summary()
                 print_info("Đầu vào đã kết thúc — Hẹn gặp lại!")
@@ -5692,6 +5810,16 @@ def main():
             else:
                 print_error(f"Quá trình thất bại: {run_err}")
                 break
+
+        # Tra Link Goc ve Telegram (neu link tu phone)
+        if tg_chat is not None:
+            if not run_err and res_url:
+                tg_push_result(tg_chat, True, link=res_url)
+                print_slot_info(0, f"📤 Da gui Link Goc ve Telegram.")
+            else:
+                tg_push_result(tg_chat, False, err=run_err or "that bai")
+                print_slot_warning(0, f"📤 Da bao loi ve Telegram: {(run_err or 'that bai')[:80]}")
+            tg_chat = None
 
         # Auto tiep: thanh cong (octolink/moneytask) HOAC that bai het luot -> tu mt lay link moi
         if mt_auto_enabled():
