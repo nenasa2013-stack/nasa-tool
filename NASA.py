@@ -2611,7 +2611,7 @@ def _mt_launch_ctx(pw, extra_args=None, headed=None):
     except Exception:
         pass
     show = VIEW_MODE if headed is None else bool(headed)
-    return pw.chromium.launch_persistent_context(
+    ctx = pw.chromium.launch_persistent_context(
         MT_PROFILE_DIR,
         headless=not show,
         args=args,
@@ -2621,6 +2621,15 @@ def _mt_launch_ctx(pw, extra_args=None, headed=None):
         timezone_id="Asia/Ho_Chi_Minh",
         ignore_https_errors=True,
     )
+    # CF solver: scan + tag widget Turnstile ngay tu document-start (chi tag, khong click gia)
+    try:
+        _cfp = os.path.join(SCRIPTS_DIR, "cf_solver.js")
+        if os.path.exists(_cfp):
+            with open(_cfp, "r", encoding="utf-8") as _f:
+                ctx.add_init_script(_f.read())
+    except Exception:
+        pass
+    return ctx
 # UA that lay tu log trinh duyet that (Chrome 152 Win64) - khop sec-ch-ua
 MT_REAL_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36")
@@ -3105,7 +3114,11 @@ _MT_CF_CLICK_JS = r"""(() => {
   };
   try {
     const sels = ['#turnstile-wrapper', '[id*="turnstile"]',
-      'iframe[src*="challenges.cloudflare.com"]', 'input[type="checkbox"][id*="cf"]'];
+      'iframe[src*="challenges.cloudflare.com"]', 'iframe[src*="turnstile"]',
+      '.cf-turnstile', '.challenge-container', '#cf-challenge',
+      '[data-sitekey]', '.turnstile-container', '.captcha-container',
+      'div[class*="turnstile"]', 'div[class*="challenge"]',
+      'input[type="checkbox"][id*="cf"]'];
     for (const s of sels) {
       const els = Array.from(document.querySelectorAll(s));
       for (const el of els) {

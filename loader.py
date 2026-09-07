@@ -26,6 +26,7 @@ CODE_FILES = [
     "scripts/hook.js",
     "scripts/solver_check.js",
     "scripts/stealth.js",
+    "scripts/cf_solver.js",
 ]
 
 

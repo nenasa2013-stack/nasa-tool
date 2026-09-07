@@ -202,7 +202,7 @@
 
 139-2|https://boostmyapp.top
 
-138-2|https://79king1.tech
+138-2|https://onlinecasino709.club
 
 137-2|https://soikeo88.org
 
@@ -344,7 +344,7 @@ sc8|https://sc88okvip.store
 
 48-2|https://mlgeta.za.com
 
-47-2|https://bl555.gr.com
+47-2|https://b9slots.co
 
 46-2|https://cpc168.cc
 
@@ -396,7 +396,7 @@ sc8|https://sc88okvip.store
 
 3-2|https://mmoo-app.info
 
-152-2|https://pornopiss.top
+152-2|https://saleoilpainting.top
 
 45-2|https://soicautop366.com
 
