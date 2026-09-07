@@ -3090,6 +3090,41 @@ _MT_CF_MARKERS = ("cf-challenge", "turnstile", "just a moment", "verify you are 
                    "challenge-platform", "checking your browser", "attention required")
 
 
+_MT_CF_CLICK_JS = r"""(() => {
+  // Tim widget Turnstile/CF challenge de click THAT (isTrusted=true) nhu tay.
+  // Tag nutOI wrapper bang data-mt-turnstile. Khong thay -> {found:false}.
+  const out = {found: false};
+  const inVp = (el) => {
+    try {
+      const r = el.getBoundingClientRect();
+      if (!r || r.width <= 0 || r.height <= 0) return false;
+      const vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+      return r.bottom > 0 && r.right > 0 && r.left < vw && r.top < vh;
+    } catch (e) { return false; }
+  };
+  try {
+    const sels = ['#turnstile-wrapper', '[id*="turnstile"]',
+      'iframe[src*="challenges.cloudflare.com"]', 'input[type="checkbox"][id*="cf"]'];
+    for (const s of sels) {
+      const els = Array.from(document.querySelectorAll(s));
+      for (const el of els) {
+        let box = el;
+        try {
+          if (el.tagName === 'IFRAME' && el.parentElement) box = el.parentElement;
+          if (box.tagName === 'DIV' && box.parentElement && box.parentElement.id &&
+              box.parentElement.id.indexOf('turnstile') >= 0) box = box.parentElement;
+        } catch (e) {}
+        if (!inVp(box)) continue;
+        try { box.dataset.mtTurnstile = '1'; } catch (e) {}
+        out.found = true;
+        return JSON.stringify(out);
+      }
+    }
+  } catch (e) {}
+  return JSON.stringify(out);
+})();"""
+
+
 def _mt_auto_pick(tasks):
     """Auto mode: chon task Uptolink (4 steps) theo ten; khong thay thi chon 0."""
     try:
@@ -3205,8 +3240,9 @@ def moneytask_auto_fetch_octo(auto=None):
             _d_hits = [m for m in _MT_CF_MARKERS if m in (_d_html + " " + _d_body).lower()]
             print_slot_info(0, "[DIAG] url=" + _d_url[:100] + " | title=" + _d_title[:80] + " | body=" + str(len(_d_body)) + " chars | api_tasks=" + str(len(captured["tasks"])))
             if _d_hits:
-                print_slot_warning(0, "[DIAG] Cloudflare markers: " + ", ".join(_d_hits) + " -> doi tu mo (20s)...")
-                for _ in range(20):
+                print_slot_warning(0, "[DIAG] Cloudflare markers: " + ", ".join(_d_hits) + " -> doi + tick that...")
+                _cf_clicks = 0
+                for _ in range(45):
                     page.wait_for_timeout(1000)
                     try:
                         _rh = page.evaluate("document.documentElement ? document.documentElement.outerHTML.slice(0,3000) : ''") or ""
@@ -3215,6 +3251,16 @@ def moneytask_auto_fetch_octo(auto=None):
                     if not any(m in _rh.lower() for m in _MT_CF_MARKERS):
                         print_slot_success(0, "[DIAG] Cloudflare tu mo, tiep tuc.")
                         break
+                    # Tick that vao widget Turnstile (toi da 3 lan, cach nhau) nhu tay
+                    if _cf_clicks < 3 and _ % 8 == 4:
+                        try:
+                            _rc = page.evaluate(_MT_CF_CLICK_JS) or "{}"
+                            if (json.loads(_rc) or {}).get("found"):
+                                _mt_trusted_click(page, page.locator("[data-mt-turnstile='1']"), timeout=8000)
+                                _cf_clicks += 1
+                                print_slot_info(0, f"[DIAG] Da tick Turnstile lan {_cf_clicks} (cho tu mo)...")
+                        except Exception:
+                            pass
                 else:
                     print_slot_warning(0, "Cloudflare bat xac thuc tay. Giai 1 lan: chay `python loader.py --view --threads 1`, go `mt`, tick checkbox Cloudflare; profile mt_profile/ se nho, lan sau headless qua thang.")
             if _d_body:
