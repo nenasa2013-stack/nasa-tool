@@ -1,8 +1,10 @@
 (function(){
 	'use strict';
 	try{Object.defineProperty(navigator,'webdriver',{get:()=>false,configurable:true});}catch(e){}
-	// KHONG fake navigator.plugins: object gia + lech mimeTypes = CreepJS bat 'lies' ngay.
-	// De fingerprint moc (headless that) diem cao hon do gia lo.
+	try{
+		const pd=[{name:'Chrome PDF Plugin',filename:'internal-pdf-viewer',description:'Portable Document Format',length:1},{name:'Chrome PDF Viewer',filename:'mhjfbmdgcfjbbpaeojofohoefgiehjai',description:'',length:1},{name:'Native Client',filename:'internal-nacl-plugin',description:'',length:2}];
+		Object.defineProperty(navigator,'plugins',{get:()=>pd,configurable:true});
+	}catch(e){}
 	try{Object.defineProperty(navigator,'languages',{get:()=>['vi-VN','vi','en-US','en'],configurable:true});}catch(e){}
 	try{Object.defineProperty(navigator,'platform',{get:()=>'Win32',configurable:true});}catch(e){}
 	try{Object.defineProperty(navigator,'hardwareConcurrency',{get:()=>4,configurable:true});}catch(e){}

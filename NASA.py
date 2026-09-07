@@ -99,7 +99,9 @@ CampaignDomainsFileName = "campaign_domains.txt"
 MoneyTaskCampaignsURL = "https://moneytask.top/api/tasks/uptolink-campaigns"
 # KHONG hardcode secret: token rieng dat qua env OCTO_MONEYTASK_TOKEN hoac file moneytask_token.txt
 defaultMoneyTaskBearer = ""
-# Camp map CHI tu file local (camp id url.md) - khong GitHub
+GitHubToken = ""
+GitHubRepo = "nasanoper/my-octo-cache"
+GitHubFile = "link.json"
 
 maxBridgeBodyBytes = 10 << 20
 
@@ -2089,6 +2091,9 @@ GLOBAL_SKIP_COOLDOWN = 600  # 10 phut (giay)
 _moneytask_lock = threading.Lock()
 _moneytask_cache = []
 _moneytask_last_fetch = 0.0
+_github_lock = threading.Lock()
+_github_cache = {}
+_github_last_fetch = 0.0
 prompt_lock = threading.Lock()
 
 
@@ -2115,21 +2120,6 @@ def money_task_bearer():
                 if not s.startswith("Bearer "):
                     s = "Bearer " + s
                 return s
-    except Exception:
-        pass
-    # Fallback: JWT token= trong moneytask_cookie.txt user da dan (het han thi bo)
-    try:
-        c = _mt_load_cookie()
-        for part in (c or "").split(";"):
-            part = part.strip()
-            if not part or "=" not in part:
-                continue
-            k, vv = part.split("=", 1)
-            if k.strip().lower() == "token" and vv.strip():
-                exp = _mt_jwt_exp(c)
-                if exp and exp < time.time():
-                    break
-                return "Bearer " + vv.strip()
     except Exception:
         pass
     return defaultMoneyTaskBearer
@@ -2192,6 +2182,46 @@ def fetch_money_task_campaigns():
         return list(_moneytask_cache)
 
 
+def fetch_github_domain_cache():
+    global _github_cache, _github_last_fetch
+    with _github_lock:
+        if time.time() - _github_last_fetch < 180 and _github_cache:
+            return dict(_github_cache)
+        for branch in ("master", "main"):
+            raw_url = f"https://raw.githubusercontent.com/{GitHubRepo}/{branch}/{GitHubFile}"
+            try:
+                r = requests.get(raw_url, timeout=8, verify=False)
+                if r.status_code == 200:
+                    data = r.json()
+                    redirects = data.get("redirects") or {}
+                    if redirects:
+                        _github_cache = redirects
+                        _github_last_fetch = time.time()
+                        return dict(redirects)
+            except Exception:
+                continue
+        try:
+            api_url = f"https://api.github.com/repos/{GitHubRepo}/contents/{GitHubFile}"
+            _gh_headers = {
+                "Accept": "application/vnd.github.v3+json",
+                "User-Agent": "OctoTool/7.3",
+            }
+            if GitHubToken:
+                _gh_headers["Authorization"] = "token " + GitHubToken
+            r = requests.get(api_url, timeout=8, headers=_gh_headers, verify=False)
+            if r.status_code == 200:
+                content = r.json().get("content", "").replace("\n", "").replace("\r", "")
+                decoded = base64.b64decode(content).decode("utf-8", "ignore")
+                redirects = json.loads(decoded).get("redirects") or {}
+                if redirects:
+                    _github_cache = redirects
+                    _github_last_fetch = time.time()
+                    return dict(redirects)
+        except Exception:
+            pass
+        return dict(_github_cache)
+
+
 def get_domain_from_money_task(task_key):
     task_key = (task_key or "").strip()
     if not task_key:
@@ -2247,6 +2277,19 @@ def get_domain_from_money_task(task_key):
             except Exception:
                 pass
             return web_url, True
+    return "", False
+
+
+def get_domain_from_github_cache(task_key):
+    task_key = (task_key or "").strip()
+    if not task_key:
+        return "", False
+    cache = fetch_github_domain_cache()
+    dom = cache.get(task_key, "")
+    if dom and not is_system_domain(dom):
+        if not dom.startswith("http://") and not dom.startswith("https://"):
+            dom = "https://" + dom
+        return dom.rstrip("/"), True
     return "", False
 
 
@@ -2375,20 +2418,15 @@ def get_campaign_domain(task_key):
     dom2 = _get_domain_from_local_file(alt)
     if dom2:
         return dom2, True
-    # 3. MoneyTask API (fallback, token cua user)
+    # 3. GitHub cache (fallback)
+    dom3, ok3 = get_domain_from_github_cache(task_key)
+    if ok3 and dom3:
+        return dom3, True
+    # 4. MoneyTask API (fallback)
     dom4, ok4 = get_domain_from_money_task(task_key)
     if ok4 and dom4:
         return dom4, True
     return "", False
-
-
-def _get_camp_map_dict():
-    """Toan bo map camp tu file local (camp id url.md + campaign_domains.txt)."""
-    _get_domain_from_local_file("__warmup__")
-    try:
-        return dict(_camp_domains_cache)
-    except Exception:
-        return {}
 
 
 def _read_campaign_file_raw():
@@ -4069,24 +4107,6 @@ class SolveContext:
         self.fail_fast = queue.Queue()
         self.nav = queue.Queue()
         self.wait_req = queue.Queue()
-        self.errors = queue.Queue()
-
-
-def is_skip_err(e):
-    """Bo qua ngay, khong retry: blacklist / gate tu choi thiet bi (fingerprint)."""
-    t = e or ""
-    return ("bỏ qua" in t) or ("danh sách đen" in t) or ("GATE_DENIED" in t)
-
-
-def _route_panel_error(sc, log_msg):
-    """GATE_DENIED tu engine -> hang errors de solve_url fail nhanh voi ly do that."""
-    try:
-        if (log_msg or "").startswith("GATE_DENIED:"):
-            sc.errors.put_nowait(log_msg)
-            return True
-    except Exception:
-        pass
-    return False
 
 
 def parse_wait_response(url_str, body_text):
@@ -4186,7 +4206,6 @@ def setup_cdp_interceptor(sc, page, context_obj):
                         elif log_type == "warn":
                             print_slot_warning(sc.slot_id, log_msg)
                         elif log_type == "error":
-                            _route_panel_error(sc, log_msg)
                             print_slot_warning(sc.slot_id, f"❌ {log_msg}")
                         else:
                             print_slot_info(sc.slot_id, f"⚡ {log_msg}")
@@ -4524,12 +4543,6 @@ def solve_url(target_url, target_domain="", slot_id=0, proxy_url="", gate_cookie
             preset_script += f"window.__OCTO_TARGET_DOMAIN__ = \"{target_domain}\";\n"
         if gate_cookies:
             preset_script += f"window.__OCTO_GATE_COOKIES__ = \"{gate_cookies}\";\n"
-        # Map camp tu file local (camp id url.md) cho engine tra, khong GitHub
-        try:
-            _camp_json = json.dumps(_get_camp_map_dict(), ensure_ascii=False)
-            preset_script += f"window.__OCTO_CAMP_MAP__ = {_camp_json};\n"
-        except Exception:
-            pass
         injection = STEALTH_JS + "\n" + preset_script + "\n" + ENGINE_JS + "\n" + GIAI_CAP_JS + "\n" + HOOK_JS
 
         if gate_cookies:
@@ -4574,15 +4587,6 @@ def solve_url(target_url, target_domain="", slot_id=0, proxy_url="", gate_cookie
                 wait_active = False
                 print_slot_warning(slot_id, f"⚠️ Fail-Fast: {fail_reason} -> Dừng sớm để xoay Proxy!")
                 return "", False, f"proxy fail-fast: {fail_reason}"
-            except queue.Empty:
-                pass
-
-            # 1b. Loi chi mang tu engine (GATE_DENIED) - fail nhanh voi ly do that
-            try:
-                gate_err = sc.errors.get_nowait()
-                clear_countdown_line()
-                wait_active = False
-                return "", False, gate_err
             except queue.Empty:
                 pass
 
@@ -5370,7 +5374,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 )
                 if not err:
                     break
-                if is_skip_err(err):
+                if ("bỏ qua" in err) or ("danh sách đen" in err):
                     print_slot_warning(slot_id, f"Nhiệm vụ được bỏ qua: {err}")
                     break
                 retryable = is_retryable_err(err)
@@ -5401,7 +5405,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     break
 
             if err:
-                if is_skip_err(err):
+                if ("bỏ qua" in err) or ("danh sách đen" in err):
                     print_slot_warning(slot_id, f"Nhiệm vụ được bỏ qua: {err}")
                 else:
                     print_slot_error(slot_id, f"Xử lý thất bại: {err}")
@@ -5761,7 +5765,7 @@ def main():
             proxy_url = get_proxy_with_api_fallback(1) or get_file_proxy(proxy_mgr, 1)
             _, _, run_err = runner.run_with_slot(task_url, 1, False, proxy_url)
             if run_err:
-                if is_skip_err(run_err):
+                if ("bỏ qua" in run_err) or ("danh sách đen" in run_err):
                     print_warning(f"Nhiệm vụ được bỏ qua: {run_err}")
                 else:
                     print_error(f"Xử lý link thất bại: {run_err}")
@@ -5845,7 +5849,7 @@ def main():
             res_url, _, run_err = runner.run_with_slot(clean_input, 1, False, proxy_url)
             if not run_err:
                 break
-            if is_skip_err(run_err):
+            if ("bỏ qua" in run_err) or ("danh sách đen" in run_err):
                 print_warning(f"Nhiệm vụ được bỏ qua: {run_err}")
                 break
             retryable = is_retryable_err(run_err)
