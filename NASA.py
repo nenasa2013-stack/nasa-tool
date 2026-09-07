@@ -3491,6 +3491,55 @@ def _mt_human_move(page, x, y, steps=24):
     except Exception:
         pass
 
+_MT_CLAIM_FIND_JS = r"""(() => {
+  // Tim nut Xac nhan THAT tren trang finish: div[role=button] chua canvas +
+  // aria-label ~ xac nhan, TRONG viewport, khong honeypot/decoy/aria-hidden.
+  // (button[type=submit] trong suot + text trong canvas -> do text vo trung moi.)
+  // Tra {found, disabled, session409}. Tag nut that = data-mt-confirm.
+  const out = {found: false, disabled: true, session409: false};
+  try {
+    const bt = (document.body ? document.body.innerText : '') || '';
+    if (/\(409\)|không xác thực được phiên|khong xac thuc duoc phien/i.test(bt)) out.session409 = true;
+  } catch (e) {}
+  const bad = (el) => {
+    try {
+      const ns = el.getAttributeNames ? el.getAttributeNames() : [];
+      for (const a of ns) {
+        const al = (a + '').toLowerCase();
+        if (al === 'data-honeypot' || al === 'data-decoy' || al === 'data-decoy-role' ||
+            al === 'data-autoclick' || al === 'data-auto-clicker' || al.indexOf('data-hpx') === 0) return true;
+      }
+      if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
+    } catch (e) {}
+    return false;
+  };
+  const inVp = (el) => {
+    try {
+      const r = el.getBoundingClientRect();
+      if (!r || r.width <= 0 || r.height <= 0) return false;
+      const vw = window.innerWidth || 1920, vh = window.innerHeight || 1080;
+      return r.bottom > 0 && r.right > 0 && r.left < vw && r.top < vh && r.left >= -2 && r.top >= -2;
+    } catch (e) { return false; }
+  };
+  try {
+    const cands = Array.from(document.querySelectorAll('div[role="button"]'));
+    for (const b of cands) {
+      if (bad(b)) continue;
+      if (!inVp(b)) continue;
+      if (!b.querySelector || !b.querySelector('canvas')) continue;
+      let lab = '';
+      try { lab = (b.getAttribute('aria-label') || '') + ''; } catch (e) {}
+      if (!/xác nhận|xac nhan|confirm|hoàn thành|hoan thanh/i.test(lab)) continue;
+      out.found = true;
+      try { out.disabled = (b.getAttribute('aria-disabled') === 'true'); } catch (e) { out.disabled = true; }
+      try { b.dataset.mtConfirm = '1'; } catch (e) {}
+      break;
+    }
+  } catch (e) {}
+  return JSON.stringify(out);
+})();""";
+
+
 _MT_CLAIM_JS_HAS_FORM = r"""(() => {
   try {
     const btns = Array.from(document.querySelectorAll('button[type="submit"], button'));
@@ -3559,33 +3608,36 @@ def moneytask_auto_claim(finish_url, slot_id=0):
                 print_slot_info(slot_id, f"⏳ [MT-CLAIM] Doi qua endTime ({int(dw)}s) roi moi bam Xac nhan...")
                 time.sleep(dw)
 
-        # Cho nut Xac nhan hien ra roi re chuot + click trusted (isTrusted=true)
-        def _mt_move_claim(lc):
+        # Doi phien finish song (nut that enable, khong 409) roi click trusted.
+        # Nut that la canvas (khong chu) -> tim bang _MT_CLAIM_FIND_JS, KHONG do text.
+        # CAM JS .click() (isTrusted=false -> flag programmatic_clicks).
+        ready = False
+        saw409 = False
+        for _ in range(30):
             try:
-                bb = lc.bounding_box(timeout=5000)
+                raw = page.evaluate(_MT_CLAIM_FIND_JS) or "{}"
+                st = json.loads(raw)
             except Exception:
-                bb = None
-            if bb:
-                _mt_human_move(page, bb["x"] + bb["width"] / 2, bb["y"] + bb["height"] / 2)
+                st = {}
+            if st.get("session409"):
+                saw409 = True
+            if st.get("found") and not st.get("disabled"):
+                ready = True
+                break
+            page.wait_for_timeout(1000)
+        if saw409 and not ready:
+            print_slot_warning(slot_id, "Phien attempt het han (409). Can nhan task moi tu 'mt' (attempt cu khong dung duoc).")
+            return False
+        if not ready:
+            print_slot_warning(slot_id, "Khong thay nut Xac nhan that (nut disabled hoac trang loi).")
+            return False
         clicked = False
         try:
-            loc = page.locator("button[type='submit']").first
-            loc.wait_for(state="visible", timeout=15000)
-            loc.scroll_into_view_if_needed(timeout=5000)
-            _mt_move_claim(loc)
-            loc.click(timeout=15000)
+            _mt_trusted_click(page, page.locator("[data-mt-confirm='1']"), timeout=15000)
             clicked = True
-        except Exception:
-            try:
-                loc2 = page.locator("button", has_text=re.compile("Xác nhận|Xac nhan", re.I)).first
-                loc2.wait_for(state="visible", timeout=15000)
-                loc2.scroll_into_view_if_needed(timeout=5000)
-                _mt_move_claim(loc2)
-                loc2.click(timeout=15000)
-                clicked = True
-            except Exception as e:
-                print_slot_warning(slot_id, f"Khong bam duoc nut Xac nhan: {e}")
-                return False
+        except Exception as e:
+            print_slot_warning(slot_id, f"Khong bam duoc nut Xac nhan: {str(e)[:300]}")
+            return False
         if not clicked:
             return False
         print_slot_info(slot_id, "Đã bấm Xác nhận, chờ kết quả claim...")
