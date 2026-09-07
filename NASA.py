@@ -2597,9 +2597,9 @@ MT_COOKIE_FILE = "moneytask_cookie.txt"
 MT_PROFILE_DIR = os.path.join(BASE_DIR, "mt_profile")
 
 
-def _mt_launch_ctx(pw, extra_args=None):
+def _mt_launch_ctx(pw, extra_args=None, headed=None):
     """Chromium PERSISTENT profile cho MoneyTask: giu cf_clearance sau khi giai tay 1 lan.
-    --view (VIEW_MODE) = mo Chrome that de user tick checkbox Cloudflare tay."""
+    headed=True/False ep hien/an; None = theo --view (VIEW_MODE)."""
     args = ["--no-sandbox", "--disable-dev-shm-usage", "--mute-audio",
             "--disable-blink-features=AutomationControlled",
             "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
@@ -2610,9 +2610,10 @@ def _mt_launch_ctx(pw, extra_args=None):
         os.makedirs(MT_PROFILE_DIR, exist_ok=True)
     except Exception:
         pass
+    show = VIEW_MODE if headed is None else bool(headed)
     return pw.chromium.launch_persistent_context(
         MT_PROFILE_DIR,
-        headless=not VIEW_MODE,
+        headless=not show,
         args=args,
         user_agent=MT_REAL_UA,
         viewport={"width": 1920, "height": 1080},
@@ -3200,12 +3201,60 @@ def moneytask_auto_fetch_octo(auto=None):
             except Exception:
                 pass
 
-        page.on("response", _on_resp)
-        try:
-            page.goto(MT_TASKS_URL, wait_until="domcontentloaded", timeout=60000)
-            page.wait_for_timeout(4000)
-        except Exception as e:
-            print_slot_warning(0, f"Mo trang MoneyTask loi: {e}")
+        def _open_tasks():
+            pg = ctx.new_page()
+            pg.on("response", _on_resp)
+            try:
+                pg.goto(MT_TASKS_URL, wait_until="domcontentloaded", timeout=60000)
+                pg.wait_for_timeout(4000)
+            except Exception as e:
+                print_slot_warning(0, f"Mo trang MoneyTask loi: {e}")
+            return pg
+
+        def _manual_solve(cur_page):
+            """CF chan cung: mo Chrome THAT cho user giai tay, Enter -> dong lai,
+            mo headless tiep (chung profile nen clearance duoc giu). Tra page moi/None."""
+            nonlocal ctx
+            if VIEW_MODE:
+                print_slot_warning(0, "Chrome that dang mo (--view): giai Cloudflare tay trong do roi Enter...")
+            else:
+                print_slot_warning(0, "Mo Chrome THAT: giai Cloudflare tay trong do...")
+                for _c in (cur_page, ctx):
+                    try:
+                        _c.close()
+                    except Exception:
+                        pass
+                try:
+                    ctx = _mt_launch_ctx(pw, headed=True)
+                    ctx.add_init_script(MT_STEALTH_JS)
+                    ctx.add_cookies(cookies)
+                except Exception as e:
+                    print_slot_warning(0, f"Mo Chrome that loi: {e}")
+                    return None
+                cur_page = ctx.new_page()
+                try:
+                    cur_page.goto(MT_TASKS_URL, wait_until="domcontentloaded", timeout=60000)
+                except Exception:
+                    pass
+            sys.stdout.write(f"  {ColorCyan2}{Bold}>> Giai Cloudflare xong bam Enter de tiep tuc: {Reset}")
+            sys.stdout.flush()
+            read_line_eof()
+            if not VIEW_MODE:
+                for _c in (cur_page, ctx):
+                    try:
+                        _c.close()
+                    except Exception:
+                        pass
+                try:
+                    ctx = _mt_launch_ctx(pw)
+                    ctx.add_init_script(MT_STEALTH_JS)
+                    ctx.add_cookies(cookies)
+                except Exception as e:
+                    print_slot_warning(0, f"Mo lai headless loi: {e}")
+                    return None
+            return _open_tasks()
+
+        page = _open_tasks()
 
         # Het han cookie -> ve trang login
         try:
@@ -3262,7 +3311,13 @@ def moneytask_auto_fetch_octo(auto=None):
                         except Exception:
                             pass
                 else:
-                    print_slot_warning(0, "Cloudflare bat xac thuc tay. Giai 1 lan: chay `python loader.py --view --threads 1`, go `mt`, tick checkbox Cloudflare; profile mt_profile/ se nho, lan sau headless qua thang.")
+                    print_slot_warning(0, "CF van chan -> mo Chrome that giai tay...")
+                    _np = _manual_solve(page)
+                    if _np is None:
+                        print_slot_warning(0, "Khong mo duoc Chrome that de giai tay.")
+                        return ""
+                    page = _np
+                    print_slot_success(0, "Da giai tay xong, tiep tuc lay task...")
             if _d_body:
                 print_slot_info(0, "[DIAG] body: " + _d_body[:200])
         except Exception as _de:
