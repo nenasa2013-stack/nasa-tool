@@ -752,15 +752,37 @@
       }
     }
 
-    // 5. Cổng kiểm tra thiết bị Octolink
+    // 5. Cổng kiểm tra thiết bị Octolink: KHONG tu POST dv='' (rong + khong RSA
+    // nhu trang that = diem tin cay thap). De trang tu submit DeviceShield that,
+    // doi dieu huong; neu bi deny thi doc ma + ly do THAT tu DOM bao ve.
     if (_0x74d2.includes('octolink.vip') && !_0x83c1.has('redirect_to_octo')) {
-      if (_0x65b0.length > 0) {
-        var _0octoAlias = _0x65b0[_0x65b0.length - 1].replace(/\.html?$/i, '');
-        if (!/^(statics|js|css|check|finish|links|forms|api|admin|login|register|modern_theme|images|wp-|favicon|robots)$/i.test(_0octoAlias) && !_0octoAlias.includes('.')) {
-          logG('Phát hiện cổng Octolink. Đang bỏ qua kiểm tra thiết bị...', 'system');
-          deviceBypass(_0octoAlias);
-        }
-      }
+      logG('Cổng Octolink: chờ trang tự xác thực thiết bị...', 'system');
+      var _0gateTries = 0;
+      var _0gateTimer = setInterval(function () {
+        try {
+          var _0denied = document.getElementById('gate-denied');
+          var _0vis = _0denied && _0denied.className.indexOf('hide') < 0;
+          var _0codeEl = _0vis ? document.getElementById('gate-code') : null;
+          var _0code = (_0codeEl && _0codeEl.textContent || '').trim();
+          if (_0vis && _0code) {
+            try { clearInterval(_0gateTimer); } catch (e) {}
+            var _0msg = '';
+            try { _0msg = (document.getElementById('gate-message').textContent || '').trim(); } catch (e) {}
+            var _0det = [];
+            try {
+              var _0lis = document.querySelectorAll('#gate-detected-list li');
+              for (var _0i = 0; _0i < _0lis.length; _0i++) {
+                var _0lt = (_0lis[_0i].textContent || '').trim().replace(/\s+/g, ' ');
+                if (_0lt) _0det.push(_0lt);
+              }
+            } catch (e) {}
+            try { console.log('[OCTO_PANEL] error | GATE_DENIED: ' + _0code + ' | ' + _0msg + ' | ' + _0det.join('; ')); } catch (_de) {}
+            return;
+          }
+        } catch (e) {}
+        _0gateTries++;
+        if (_0gateTries > 45) { try { clearInterval(_0gateTimer); } catch (e) {} }
+      }, 2000);
       return;
     }
 

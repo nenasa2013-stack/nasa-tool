@@ -4107,6 +4107,24 @@ class SolveContext:
         self.fail_fast = queue.Queue()
         self.nav = queue.Queue()
         self.wait_req = queue.Queue()
+        self.errors = queue.Queue()
+
+
+def is_skip_err(e):
+    """Bo qua ngay, khong retry: blacklist / gate tu choi thiet bi (fingerprint)."""
+    t = e or ""
+    return ("bỏ qua" in t) or ("danh sách đen" in t) or ("GATE_DENIED" in t)
+
+
+def _route_panel_error(sc, log_msg):
+    """GATE_DENIED tu engine -> hang errors de solve_url fail nhanh voi ly do that."""
+    try:
+        if (log_msg or "").startswith("GATE_DENIED:"):
+            sc.errors.put_nowait(log_msg)
+            return True
+    except Exception:
+        pass
+    return False
 
 
 def parse_wait_response(url_str, body_text):
@@ -4206,6 +4224,7 @@ def setup_cdp_interceptor(sc, page, context_obj):
                         elif log_type == "warn":
                             print_slot_warning(sc.slot_id, log_msg)
                         elif log_type == "error":
+                            _route_panel_error(sc, log_msg)
                             print_slot_warning(sc.slot_id, f"❌ {log_msg}")
                         else:
                             print_slot_info(sc.slot_id, f"⚡ {log_msg}")
@@ -4587,6 +4606,15 @@ def solve_url(target_url, target_domain="", slot_id=0, proxy_url="", gate_cookie
                 wait_active = False
                 print_slot_warning(slot_id, f"⚠️ Fail-Fast: {fail_reason} -> Dừng sớm để xoay Proxy!")
                 return "", False, f"proxy fail-fast: {fail_reason}"
+            except queue.Empty:
+                pass
+
+            # 1b. Loi chi mang tu engine (GATE_DENIED) - fail nhanh voi ly do that
+            try:
+                gate_err = sc.errors.get_nowait()
+                clear_countdown_line()
+                wait_active = False
+                return "", False, gate_err
             except queue.Empty:
                 pass
 
@@ -5374,7 +5402,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 )
                 if not err:
                     break
-                if ("bỏ qua" in err) or ("danh sách đen" in err):
+                if is_skip_err(err):
                     print_slot_warning(slot_id, f"Nhiệm vụ được bỏ qua: {err}")
                     break
                 retryable = is_retryable_err(err)
@@ -5405,7 +5433,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     break
 
             if err:
-                if ("bỏ qua" in err) or ("danh sách đen" in err):
+                if is_skip_err(err):
                     print_slot_warning(slot_id, f"Nhiệm vụ được bỏ qua: {err}")
                 else:
                     print_slot_error(slot_id, f"Xử lý thất bại: {err}")
@@ -5765,7 +5793,7 @@ def main():
             proxy_url = get_proxy_with_api_fallback(1) or get_file_proxy(proxy_mgr, 1)
             _, _, run_err = runner.run_with_slot(task_url, 1, False, proxy_url)
             if run_err:
-                if ("bỏ qua" in run_err) or ("danh sách đen" in run_err):
+                if is_skip_err(run_err):
                     print_warning(f"Nhiệm vụ được bỏ qua: {run_err}")
                 else:
                     print_error(f"Xử lý link thất bại: {run_err}")
@@ -5849,7 +5877,7 @@ def main():
             res_url, _, run_err = runner.run_with_slot(clean_input, 1, False, proxy_url)
             if not run_err:
                 break
-            if ("bỏ qua" in run_err) or ("danh sách đen" in run_err):
+            if is_skip_err(run_err):
                 print_warning(f"Nhiệm vụ được bỏ qua: {run_err}")
                 break
             retryable = is_retryable_err(run_err)
