@@ -99,9 +99,7 @@ CampaignDomainsFileName = "campaign_domains.txt"
 MoneyTaskCampaignsURL = "https://moneytask.top/api/tasks/uptolink-campaigns"
 # KHONG hardcode secret: token rieng dat qua env OCTO_MONEYTASK_TOKEN hoac file moneytask_token.txt
 defaultMoneyTaskBearer = ""
-GitHubToken = ""
-GitHubRepo = "nasanoper/my-octo-cache"
-GitHubFile = "link.json"
+# Camp map CHI tu file local (camp id url.md) - khong GitHub
 
 maxBridgeBodyBytes = 10 << 20
 
@@ -2091,9 +2089,6 @@ GLOBAL_SKIP_COOLDOWN = 600  # 10 phut (giay)
 _moneytask_lock = threading.Lock()
 _moneytask_cache = []
 _moneytask_last_fetch = 0.0
-_github_lock = threading.Lock()
-_github_cache = {}
-_github_last_fetch = 0.0
 prompt_lock = threading.Lock()
 
 
@@ -2197,46 +2192,6 @@ def fetch_money_task_campaigns():
         return list(_moneytask_cache)
 
 
-def fetch_github_domain_cache():
-    global _github_cache, _github_last_fetch
-    with _github_lock:
-        if time.time() - _github_last_fetch < 180 and _github_cache:
-            return dict(_github_cache)
-        for branch in ("master", "main"):
-            raw_url = f"https://raw.githubusercontent.com/{GitHubRepo}/{branch}/{GitHubFile}"
-            try:
-                r = requests.get(raw_url, timeout=8, verify=False)
-                if r.status_code == 200:
-                    data = r.json()
-                    redirects = data.get("redirects") or {}
-                    if redirects:
-                        _github_cache = redirects
-                        _github_last_fetch = time.time()
-                        return dict(redirects)
-            except Exception:
-                continue
-        try:
-            api_url = f"https://api.github.com/repos/{GitHubRepo}/contents/{GitHubFile}"
-            _gh_headers = {
-                "Accept": "application/vnd.github.v3+json",
-                "User-Agent": "OctoTool/7.3",
-            }
-            if GitHubToken:
-                _gh_headers["Authorization"] = "token " + GitHubToken
-            r = requests.get(api_url, timeout=8, headers=_gh_headers, verify=False)
-            if r.status_code == 200:
-                content = r.json().get("content", "").replace("\n", "").replace("\r", "")
-                decoded = base64.b64decode(content).decode("utf-8", "ignore")
-                redirects = json.loads(decoded).get("redirects") or {}
-                if redirects:
-                    _github_cache = redirects
-                    _github_last_fetch = time.time()
-                    return dict(redirects)
-        except Exception:
-            pass
-        return dict(_github_cache)
-
-
 def get_domain_from_money_task(task_key):
     task_key = (task_key or "").strip()
     if not task_key:
@@ -2292,19 +2247,6 @@ def get_domain_from_money_task(task_key):
             except Exception:
                 pass
             return web_url, True
-    return "", False
-
-
-def get_domain_from_github_cache(task_key):
-    task_key = (task_key or "").strip()
-    if not task_key:
-        return "", False
-    cache = fetch_github_domain_cache()
-    dom = cache.get(task_key, "")
-    if dom and not is_system_domain(dom):
-        if not dom.startswith("http://") and not dom.startswith("https://"):
-            dom = "https://" + dom
-        return dom.rstrip("/"), True
     return "", False
 
 
@@ -2433,15 +2375,20 @@ def get_campaign_domain(task_key):
     dom2 = _get_domain_from_local_file(alt)
     if dom2:
         return dom2, True
-    # 3. GitHub cache (fallback)
-    dom3, ok3 = get_domain_from_github_cache(task_key)
-    if ok3 and dom3:
-        return dom3, True
-    # 4. MoneyTask API (fallback)
+    # 3. MoneyTask API (fallback, token cua user)
     dom4, ok4 = get_domain_from_money_task(task_key)
     if ok4 and dom4:
         return dom4, True
     return "", False
+
+
+def _get_camp_map_dict():
+    """Toan bo map camp tu file local (camp id url.md + campaign_domains.txt)."""
+    _get_domain_from_local_file("__warmup__")
+    try:
+        return dict(_camp_domains_cache)
+    except Exception:
+        return {}
 
 
 def _read_campaign_file_raw():
@@ -4577,6 +4524,12 @@ def solve_url(target_url, target_domain="", slot_id=0, proxy_url="", gate_cookie
             preset_script += f"window.__OCTO_TARGET_DOMAIN__ = \"{target_domain}\";\n"
         if gate_cookies:
             preset_script += f"window.__OCTO_GATE_COOKIES__ = \"{gate_cookies}\";\n"
+        # Map camp tu file local (camp id url.md) cho engine tra, khong GitHub
+        try:
+            _camp_json = json.dumps(_get_camp_map_dict(), ensure_ascii=False)
+            preset_script += f"window.__OCTO_CAMP_MAP__ = {_camp_json};\n"
+        except Exception:
+            pass
         injection = STEALTH_JS + "\n" + preset_script + "\n" + ENGINE_JS + "\n" + GIAI_CAP_JS + "\n" + HOOK_JS
 
         if gate_cookies:

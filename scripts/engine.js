@@ -366,10 +366,7 @@
       window.location.href = _0x4f12; return;
     }
 
-    // GITHUB CONFIG & MONEYTASK BEARER
-    const _0xlinkToken = '';
-    const _0xlinkRepo = 'nasanoper/my-octo-cache';
-    const _0xlinkFile = 'link.json';
+    // Camp map tu file local (khong GitHub). Bearer mac dinh rong (token rieng qua cookie).
     const MONEYTASK_BEARER = '';
     const _0DEMO_RD = 'Ym90Z3VhcmQtY29udGFjdEBnb29nbGUuY29t';
 
@@ -863,70 +860,24 @@
       });
     }
 
+    // Tra camp map tu file local (Python bom window.__OCTO_CAMP_MAP__). Khong GitHub.
     function getCacheR(_0xk) {
       try{console.log("[OCTO_PANEL] system | getCacheR fallback: "+(_0xk));}catch(_de){}
-      function _tryRawFallback() {
-        logG('Đang tải dữ liệu đám mây từ Raw GitHub...', 'system');
-        _0GM({
-          method: 'GET',
-          url: `https://raw.githubusercontent.com/${_0xlinkRepo}/master/${_0xlinkFile}?t=${Date.now()}`,
-          onload: function(_0rRaw) {
-            if (_0rRaw.status === 200) {
-              try {
-                let _0xcc = JSON.parse(_0rRaw.responseText);
-                if (_0xcc && _0xcc.redirects && _0xcc.redirects[_0xk]) {
-                  let _0xct = _0xcc.redirects[_0xk];
-                  logG(`Phát hiện bản lưu đám mây (Raw): ${_0xct}`, 'success');
-                  return loadJsC(_0xct.startsWith('http') ? _0xct : `https://${_0xct}`, 'cache', null);
-                }
-              } catch (e) {}
-            }
-            logG('Nhiệm vụ mới hoàn toàn. Kích hoạt chế độ nhập thủ công.', 'warn');
-            showM();
-          },
-          onerror: function() { logG('Mất kết nối Raw GitHub.', 'error'); showM(); },
-          ontimeout: function() { logG('Quá thời gian Raw GitHub.', 'error'); showM(); }
-        });
-      }
-
-      if (!_0xlinkToken) { return _tryRawFallback(); }
-      logG('Đang kết nối API thời gian thực để lấy dữ liệu đám mây...', 'system');
-      _0GM({
-        method: 'GET', url: `https://api.github.com/repos/${_0xlinkRepo}/contents/${_0xlinkFile}?t=${new Date().getTime()}`, headers: { Authorization: `token ${_0xlinkToken}`, Accept: 'application/vnd.github.v3+json' },
-        onload: function (_0xres) {
-          if (_0xres.status !== 200) { return _tryRawFallback(); }
-          try {
-            let _0xj = JSON.parse(_0xres.responseText);
-            if (_0xj.content) {
-              let _0xdc = b64D(_0xj.content), _0xcc = JSON.parse(_0xdc);
-              if (_0xcc.enabled && _0xcc.redirects[_0xk]) {
-                let _0xct = _0xcc.redirects[_0xk]; logG(`Phát hiện bản lưu đám mây: ${_0xct}`, 'success');
-                loadJsC(_0xct.startsWith('http') ? _0xct : `https://${_0xct}`, 'cache', null);
-              } else { _tryRawFallback(); }
-            } else { _tryRawFallback(); }
-          } catch (e) { _tryRawFallback(); }
-        }, onerror: function() { _tryRawFallback(); }, ontimeout: function() { _tryRawFallback(); }
-      });
-    }
-
-    function syncGit(_0xk, _0xdv) {
-      if (!_0xlinkToken) return; logG('Đang đồng bộ hóa dữ liệu lên hệ thống lưu trữ...', 'system');
-      const _0xapi = `https://api.github.com/repos/${_0xlinkRepo}/contents/${_0xlinkFile}`;
-      _0GM({
-        method: 'GET', url: _0xapi, headers: { Authorization: `token ${_0xlinkToken}`, Accept: 'application/vnd.github.v3+json' },
-        onload: function (_0xrG) {
-          if (_0xrG.status !== 200) { logG('Không thể đọc dữ liệu từ GitHub.', 'error'); return; }
-          try {
-            let _0xjg = JSON.parse(_0xrG.responseText), _0xghD = b64D(_0xjg.content), _0xghN = JSON.parse(_0xghD);
-            if (!_0xghN.redirects) _0xghN.redirects = {}; _0xghN.redirects[_0xk] = _0xdv;
-            let _0xghE = btoa(unescape(encodeURIComponent(JSON.stringify(_0xghN, null, 2))));
-            _0GM({
-              method: 'PUT', url: _0xapi, headers: { Authorization: `token ${_0xlinkToken}`, Accept: 'application/vnd.github.v3+json' }, data: JSON.stringify({ message: `Auto Sync: ID ${_0xk} -> ${_0xdv}`, content: _0xghE, sha: _0xjg.sha }),
-              onload: function (_0xrP) { if (_0xrP.status === 200 || _0xrP.status === 201) { logG('Đã cập nhật an toàn vào cơ sở dữ liệu hệ thống.', 'success'); } else { logG('Cập nhật GitHub thất bại.', 'error'); } }
-            });
-          } catch(e) { logG('Lỗi xử lý dữ liệu GitHub: ' + e.message, 'error'); }
+      try {
+        var _0map = window.__OCTO_CAMP_MAP__ || {};
+        var _0ct = _0map[_0xk] || _0map[String(_0xk).toLowerCase()];
+        if (!_0ct) {
+          for (var _0k in _0map) {
+            try { if (String(_0k).toLowerCase() === String(_0xk).toLowerCase()) { _0ct = _0map[_0k]; break; } } catch (e) {}
+          }
         }
-      });
+        if (_0ct) {
+          logG('Map local: [' + _0xk + '] -> ' + _0ct, 'success');
+          return loadJsC(String(_0ct).startsWith('http') ? String(_0ct) : 'https://' + String(_0ct), 'cache', null);
+        }
+      } catch (e) {}
+      logG('Nhiệm vụ mới hoàn toàn. Kích hoạt chế độ nhập thủ công.', 'warn');
+      showM();
     }
 
     function showM() {
@@ -1000,7 +951,7 @@
           }
           logG('Mã hóa hợp lệ. Cho phép tiến hành bước tiếp theo.', 'success');
           let _0xclnu = _0xud.replace(/https?:\/\//i, '').replace(/\/$/, '');
-          if (_0xsrc === 'manual') { syncGit(_0x54fa, _0xclnu); let _0xiel = document.getElementById('manual-input-container'); if (_0xiel) _0xiel.style.display = 'none'; }
+          if (_0xsrc === 'manual') { let _0xiel = document.getElementById('manual-input-container'); if (_0xiel) _0xiel.style.display = 'none'; }
           startJ(_0xmRD[1], _0xud, 0, _0xsrc);
         },
         onerror: function () { if (_0xsrc === 'cache') showM(); },
