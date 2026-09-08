@@ -4706,35 +4706,21 @@ def solve_url(target_url, target_domain="", slot_id=0, proxy_url="", gate_cookie
             except queue.Empty:
                 pass
 
-            # 2. Nav tu engine (REDIRECT_TO_OCTO_SUCCESS) - di qua redirect_to_octo nhu Chodenocto 5.5
+            # 2. Nav tu engine (REDIRECT_TO_OCTO_SUCCESS) - Y DUC 5.5: di NGUYEN
+            # URL trang trung gian base/?redirect_to_octo=... (cung jar cookie day du),
+            # de engine lam splash + meta referrer unsafe-url + anchor click sang finish.
+            # CAM tach finish di tat (mat referrer + session trang dich).
             try:
                 nav_url = sc.nav.get_nowait()
                 clear_countdown_line()
                 wait_active = False
-                # neu la redirect_to_octo -> tach finish url va di voi referer nhu ban goc, roi kich hoat giai captcha lay Link Goc (khong bam)
                 if "redirect_to_octo=" in nav_url:
+                    print_slot_info(slot_id, f"➡️ Qua trang trung gian redirect_to_octo -> {nav_url[:100]}...")
                     try:
-                        from urllib.parse import unquote as _uq
-                        base = getattr(sc, "target_domain", "") or ""
-                        qpart = nav_url.split("redirect_to_octo=", 1)[1].split("&")[0]
-                        finish_url = _uq(qpart)
-                        if finish_url.startswith("http"):
-                            print_slot_info(slot_id, f"➡️ Đi qua redirect_to_octo -> {finish_url[:80]}...")
-                            try:
-                                page.goto(finish_url, wait_until="commit", timeout=60000, referer=base if base else None)
-                            except Exception:
-                                pass
-                            print_slot_info(slot_id, f"Đã tới trang finish, kích hoạt giải captcha để lấy Link Gốc trong nút (không bấm)...")
-                        else:
-                            try:
-                                page.goto(nav_url, wait_until="commit", timeout=60000)
-                            except Exception:
-                                pass
+                        page.goto(nav_url, wait_until="commit", timeout=60000)
                     except Exception:
-                        try:
-                            page.goto(nav_url, wait_until="commit", timeout=60000)
-                        except Exception:
-                            pass
+                        pass
+                    print_slot_info(slot_id, f"Đã tới trang trung gian, chờ engine điều hướng sang finish...")
                 else:
                     try:
                         page.goto(nav_url, wait_until="commit", timeout=60000)
