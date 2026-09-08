@@ -448,7 +448,27 @@
     const _0xhasC = document.querySelector('input[name="_csrfToken"]') !== null;
     const _0xregL = /<a[^>]+href=["']([^"']+)["'][^>]*>Link\s*G[óo]c<\/a>/i;
     const _0xmatchL = document.body ? document.body.innerHTML.match(_0xregL) : null;
-    if (!_0xisH && !_0xhasC && !_0xmatchL && !_0x74d2.includes('octolink.vip')) return;
+    // 2b. Trang domain dich co preset (Python mo thang): chay loadJsC nhu manual JS.
+    function _0startFromPreset() {
+      try {
+        var _0pd = String(window.__OCTO_TARGET_DOMAIN__ || '').replace(/\/+$/, '');
+        if (!_0pd) return false;
+        var _0ph = new URL(_0pd.startsWith('http') ? _0pd : 'https://' + _0pd).hostname;
+        if (!_0ph) return false;
+        var _0h = '';
+        try { _0h = window.location.hostname || ''; } catch (e) {}
+        if (_0h && (_0h === _0ph || _0h.endsWith('.' + _0ph))) {
+          logG('Domain dich co preset, chay thang: ' + _0pd, 'success');
+          loadJsC(_0pd.startsWith('http') ? _0pd : 'https://' + _0pd, 'cache', null);
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
+    if (!_0xisH && !_0xhasC && !_0xmatchL && !_0x74d2.includes('octolink.vip')) {
+      try { if (_0startFromPreset()) return; } catch (e) {}
+      return;
+    }
 
     // =========================================================================
     // 8. GIAO DIỆN HOA ANH ĐÀO LUX PANEL (SAKURA THEME)

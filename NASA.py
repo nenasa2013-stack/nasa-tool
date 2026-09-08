@@ -4089,6 +4089,19 @@ def is_transient_nav_host(url_str):
     return any(d in lower for d in TRANSIENT_NAV_HOSTS)
 
 
+def _solve_start_url(raw_input, target_domain=""):
+    """URL mo trinh duyet: linkhuongdan (da qua cong) giu nguyen;
+    chua qua thi mo thang domain camp; khong co thi link octo goc."""
+    r = (raw_input or "").strip()
+    rl = r.lower()
+    if "linkhuongdan" in rl or "totreview.com" in rl:
+        return r
+    t = (target_domain or "").strip().rstrip("/")
+    if t:
+        return t
+    return r
+
+
 def _gate_landing_info(url_str):
     """Nhan dien landing linkhuongdan ?qq=complete sau cong. Tra (True/False, task_id)."""
     try:
@@ -5105,7 +5118,10 @@ class JobRunner:
                     return "", False, f"đã bỏ qua campaign [{task_key}] do chưa có tên miền web đích"
 
         # 5. Solve - MoneyTask: tam dung goi them link khi dang o chang 1 cho den khi co Link Goc
-        start_url = raw_input
+        # Mo thang domain camp khi biet (lay check/job tu do, nhu manual JS)
+        start_url = _solve_start_url(raw_input, target_domain)
+        if start_url != raw_input:
+            print_slot_info(slot_id, f"🌐 Mở thẳng domain camp: {start_url[:80]}...")
         if VIEW_MODE:
             print_slot_info(slot_id, f"🖥️ [VIEW MODE] Mở Chrome thật để theo dõi quá trình giải: {start_url}")
         else:
