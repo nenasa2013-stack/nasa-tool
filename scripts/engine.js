@@ -667,10 +667,11 @@
     // 3. Xử lý Form Captcha đích
     if ((!_0xisH && _0xhasC) || _0xmatchL) {
       logG('Đã tiếp cận trang đích an toàn.', 'system'); disableC();
-      if (_0xmatchL) {
+      var _0picked0 = _0pickLink(_0xmatchL);
+      if (_0picked0) {
         logG('Hoàn tất quá trình! Đã tìm thấy liên kết.', 'success');
         incrementCuttayTaskCount();
-        setTimeout(() => { window.location.href = _0xmatchL[1]; }, 1000);
+        setTimeout(() => { window.location.href = _0picked0; }, 1000);
         return;
       }
       let _0xfrm = document.getElementById('link-view') || document.querySelector('form');
@@ -701,10 +702,11 @@
                 }
               }
             }
-            if (_0xlnk) {
-              logG('🏆 LINK GỐC: ' + _0xlnk[1], 'success');
+            var _0picked = _0pickLink(_0xlnk);
+            if (_0picked) {
+              logG('🏆 LINK GỐC: ' + _0picked, 'success');
               incrementCuttayTaskCount();
-              window.__OCTO_SOLVE_RESULT__ = { type: 'url', data: _0xlnk[1] }; try { console.log('[OCTO_PANEL] success | ' + _0xlnk[1]); } catch(_e) {} setTimeout(function() { try { window.location.href = _0xlnk[1]; } catch(_e2) {} }, 400);
+              window.__OCTO_SOLVE_RESULT__ = { type: 'url', data: _0picked }; try { console.log('[OCTO_PANEL] success | ' + _0picked); } catch(_e) {} setTimeout(function() { try { window.location.href = _0picked; } catch(_e2) {} }, 400);
             } else {
               var _0anyLink = _0xh.match(/href=["'](https?:\/\/[^"']+)["'][^>]*>(?:[^<]{0,50})?(?:gốc|link|tiếp tục|continue)/i);
               if (_0anyLink && _isRealDest(_0anyLink[1])) {
@@ -792,6 +794,14 @@
     function getO(_0xu) { try { return new URL(_0xu).origin; } catch (e) { return _0xu; } }
 
     function b64D(_0xs) { try { return decodeURIComponent(atob(_0xs).split('').map(function(c) { return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join('')); } catch(e) { return atob(_0xs); } }
+
+    // Chi nhan link that (loc home/nav octolink...). Tra url hoac ''.
+    function _0pickLink(_0m) {
+      try {
+        if (_0m && _0m[1] && _isRealDest(_0m[1])) return _0m[1];
+      } catch (e) {}
+      return '';
+    }
 
     function _isRealDest(u) {
       if (!u || typeof u !== 'string' || !u.startsWith('http')) return false;

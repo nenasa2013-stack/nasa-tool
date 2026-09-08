@@ -190,7 +190,7 @@
 
 145-2|https://aquasursolar.co
 
-144-2|https://mornex.in
+144-2|https://qkdy.tv
 
 143-2|https://ao88-vip.com
 
@@ -216,7 +216,7 @@
 
 131-2|https://koone.io
 
-130-2|https://verkoopthier.nl
+130-2|https://fun88ok3.com
 
 129-2|https://xpell.io
 
@@ -298,7 +298,7 @@ sc8|https://sc88okvip.store
 
 81-2|https://swiftcasinoes.top
 
-80-2|https://persik.tv
+80-2|https://skeef.io
 
 79-2|https://clgvlc.sa.com
 
