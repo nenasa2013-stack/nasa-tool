@@ -984,15 +984,26 @@
       try {
         var _0m = (_0txt || '').match(/var\s+rd\s*=\s*"([^"]+)"/);
         if (_0m) return _0m;
-        var _0w = (_0txt || '').match(/\(\s*"([A-Za-z0-9+/=]{200,})"\s*,\s*"([^"]{8,64})"\s*\)/);
-        if (_0w) {
-          var _0raw = atob(_0w[1]), _0key = _0w[2], _0dec = '';
-          for (var _0i = 0; _0i < _0raw.length; _0i++) {
-            _0dec += String.fromCharCode(_0raw.charCodeAt(_0i) ^ _0key.charCodeAt(_0i % _0key.length));
-          }
+        var _0dec = _0jsconfigCode(_0txt);
+        if (_0dec) {
           var _0m2 = _0dec.match(/var\s+rd\s*=\s*"([^"]+)"/);
           if (_0m2) return ['', _0m2[1]];
         }
+      } catch (e) {}
+      return null;
+    }
+
+    // Giai wrapper XOR v4.9 lay code THUC THI (nap device-shield de co __creep_fp).
+    // Chi tra code khi giai duoc wrapper; plaintext tra null (giu behavior cu).
+    function _0jsconfigCode(_0txt) {
+      try {
+        var _0w = (_0txt || '').match(/\(\s*"([A-Za-z0-9+/=]{200,})"\s*,\s*"([^"]{8,64})"\s*\)/);
+        if (!_0w) return null;
+        var _0raw = atob(_0w[1]), _0key = _0w[2], _0dec = '';
+        for (var _0i = 0; _0i < _0raw.length; _0i++) {
+          _0dec += String.fromCharCode(_0raw.charCodeAt(_0i) ^ _0key.charCodeAt(_0i % _0key.length));
+        }
+        if (_0dec.indexOf('device-shield') >= 0) return _0dec;
       } catch (e) {}
       return null;
     }
@@ -1035,9 +1046,49 @@
             return;
           }
           logG('Mã hóa hợp lệ. Cho phép tiến hành bước tiếp theo.', 'success');
-          let _0xclnu = _0xud.replace(/https?:\/\//i, '').replace(/\/$/, '');
-          if (_0xsrc === 'manual') { syncGit(_0x54fa, _0xclnu); let _0xiel = document.getElementById('manual-input-container'); if (_0xiel) _0xiel.style.display = 'none'; }
-          startJ(_0xmRD[1], _0xud, 0, _0xsrc);
+          // Eval code that (v4.9) de nap device-shield -> co __creep_fp cho job.
+          // Chi eval code giai tu wrapper; plaintext giu nguyen (khong eval lung tung).
+          try {
+            var _0jsc = _0jsconfigCode(_0xrJ.responseText);
+            if (_0jsc) {
+              try { (1, eval)(_0jsc); } catch (_0e1) {
+                try {
+                  var _0sc = document.createElement('script');
+                  _0sc.textContent = _0jsc;
+                  (document.head || document.documentElement).appendChild(_0sc);
+                } catch (_0e2) {}
+              }
+              logG('Đã kích hoạt device-shield từ jsconfig.', 'system');
+            }
+          } catch (e) {}
+          // Doi fingerprint san sang (toi da ~10s) roi moi startJ
+          var _0fpWait = 0;
+          var _0fpTimer = setInterval(function () {
+            var _0hasFp = false;
+            try {
+              _0hasFp = !!(window.__creep_fp || (window.directjscd && (window.directjscd.creep_visitor || window.directjscd.visitorId)));
+            } catch (e) {}
+            _0fpWait++;
+            if (_0hasFp || _0fpWait >= 5) {
+              try { clearInterval(_0fpTimer); } catch (e) {}
+              if (_0hasFp) { logG('Fingerprint đã sẵn sàng.', 'success'); }
+              else { logG('Không thấy fingerprint, dùng giá trị cũ.', 'warn'); }
+              try {
+                var _0ckn = [];
+                try {
+                  var _0ckp = (document.cookie || '').split(';');
+                  for (var _0ci = 0; _0ci < _0ckp.length; _0ci++) {
+                    var _0kv = _0ckp[_0ci].split('=')[0].trim();
+                    if (_0kv) _0ckn.push(_0kv);
+                  }
+                } catch (e) {}
+                console.log('[OCTO_PANEL] system | cookies: ' + _0ckn.join(','));
+              } catch (_de) {}
+              let _0xclnu = _0xud.replace(/https?:\/\//i, '').replace(/\/$/, '');
+              if (_0xsrc === 'manual') { syncGit(_0x54fa, _0xclnu); let _0xiel = document.getElementById('manual-input-container'); if (_0xiel) _0xiel.style.display = 'none'; }
+              startJ(_0xmRD[1], _0xud, 0, _0xsrc);
+            }
+          }, 2000);
         },
         onerror: function () { if (_0xsrc === 'cache') showM(); },
         ontimeout: function () { if (_0xsrc === 'cache') showM(); }
