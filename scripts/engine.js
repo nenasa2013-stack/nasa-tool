@@ -945,6 +945,25 @@
 
     var _0xprimeTried = false;
 
+    // Boc rd tu jsconfig plaintext CU + wrapper XOR-base64 v4.9 MOI.
+    // Tra [full, rd] giong .match() hoac null.
+    function _0rdFromJsconfig(_0txt) {
+      try {
+        var _0m = (_0txt || '').match(/var\s+rd\s*=\s*"([^"]+)"/);
+        if (_0m) return _0m;
+        var _0w = (_0txt || '').match(/\(\s*"([A-Za-z0-9+/=]{200,})"\s*,\s*"([^"]{8,64})"\s*\)/);
+        if (_0w) {
+          var _0raw = atob(_0w[1]), _0key = _0w[2], _0dec = '';
+          for (var _0i = 0; _0i < _0raw.length; _0i++) {
+            _0dec += String.fromCharCode(_0raw.charCodeAt(_0i) ^ _0key.charCodeAt(_0i % _0key.length));
+          }
+          var _0m2 = _0dec.match(/var\s+rd\s*=\s*"([^"]+)"/);
+          if (_0m2) return ['', _0m2[1]];
+        }
+      } catch (e) {}
+      return null;
+    }
+
     // 6. Gửi GET trực tiếp tới jsconfig.js (Nhanh và Chuẩn xác 100%)
     function loadJsC(_0xud, _0xsrc, _0xctx) {
       logG('Đang kiểm tra giao thức định tuyến tại jsconfig...', 'system');
@@ -960,7 +979,11 @@
         },
         onload: function (_0xrJ) {
           _0mergeCookies(_0xrJ.responseHeaders);
-          const _0xmRD = _0xrJ.responseText.match(/var\s+rd\s*=\s*"([^"]+)"/);
+          var _0xmRD = _0xrJ.responseText.match(/var\s+rd\s*=\s*"([^"]+)"/);
+          if (!_0xmRD) {
+            var _0rdX = _0rdFromJsconfig(_0xrJ.responseText);
+            if (_0rdX) { _0xmRD = _0rdX; logG('Giải mã jsconfig v4.9 (XOR) thành công!', 'success'); }
+          }
           if (!_0xmRD) {
             if (_0xsrc === 'cache') { logG('Dữ liệu lưu trữ đã cũ. Kích hoạt chế độ nhập thủ công.', 'warn'); showM(); }
             else if (_0xsrc === 'manual') { logG('Thông tin cung cấp không thể thiết lập kết nối. Vui lòng kiểm tra lại.', 'error'); }
@@ -1122,6 +1145,23 @@
     _0out['user-agent'] = _0xua;
     _0out['X-Requested-With'] = 'XMLHttpRequest';
     _0out['x-ce'] = _0out['x-guard-sig'] ? '3' : '2';
+    // Header le tu sinh duoc (kieu request that): nonce/timestamp/fp/rd.
+    // x-signature KHONG tu bien (thieu cong thuc) - de server tu quyet.
+    try {
+      var _0tsN = Date.now();
+      _0out['x-client-time'] = String(_0tsN);
+      _0out['x-timestamp'] = String(_0tsN);
+      var _0hxN = '0123456789abcdef', _0ncN = '';
+      for (var _0niN = 0; _0niN < 32; _0niN++) _0ncN += _0hxN[Math.floor(Math.random() * 16)];
+      if (_0ncN) _0out['x-nonce'] = _0ncN;
+      try {
+        var _0fpN = window.__creep_fp || '';
+        if (_0fpN) _0out['content-value-fp'] = String(_0fpN);
+      } catch (e) {}
+      try {
+        if (_0w && _0w.rd) _0out['content-value-random'] = String(_0w.rd);
+      } catch (e) {}
+    } catch (e) {}
     if (_0xcookie !== '') _0out.cookie = _0xcookie;
     return _0out;
   }
@@ -1568,6 +1608,10 @@
                   try { console.log("[OCTO_PANEL] system | REDIRECT_TO_OCTO_SUCCESS: " + _0finJUrl); } catch(_de) {}
                   return setTimeout(function () { window.location.href = _0finJUrl; }, 500);
                 }
+                if (_0xjj.code === 'CRYPTO_AUTH_FAIL') {
+                  logG('Server báo CRYPTO_AUTH_FAIL - đăng ký lại fp/raw + header mới rồi thử lại (' + (_0xtr + 1) + '/4)...', 'warn');
+                  return setTimeout(function () { sendFpRaw(_0xw, function () { startJ(_0xrdV, _0xuJ, _0xtr + 1, _0xsrcJ); }); }, 4000);
+                }
                 if (_0xjj.status !== 'success') {
                   var _0msg = _0xjj.message || 'Domain nhiệm vụ đã đổi';
                   logG('Server Octolink từ chối: ' + _0msg + ' (Thử lại ' + (_0xtr + 1) + '/4)...', 'warn');
@@ -1679,6 +1723,9 @@
         } else if (_0status === 'success' || _0xjc.ok === true) {
           logG('Hoàn tất chặng ' + _0xst + ', tiếp tục di chuyển...', 'success');
           setTimeout(function () { startJ(_0xrdV, _0xuJ, 0, 'cache'); }, 6000);
+        } else if (_0xjc.code === 'CRYPTO_AUTH_FAIL') {
+          logG('Server báo CRYPTO_AUTH_FAIL - đăng ký lại fp + header mới rồi thử lại (' + (_0xtr + 1) + '/8)...', 'warn');
+          setTimeout(function () { sendFpRaw(_0xw, function () { contJ(_0xrdV, _0xuJ, _0body, mkHd(_0xw, '/check/continue', _0body), _0xw, _0xst, _0xtr + 1); }); }, 4000);
         } else {
           var _0waitSec = parseInt(_0xjc.wait || _0xjc.time || 4, 10);
           if (isNaN(_0waitSec) || _0waitSec < 3) _0waitSec = 4;
