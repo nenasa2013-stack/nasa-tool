@@ -737,8 +737,10 @@
       return;
     }
 
-    // 4. Nhận diện mã nhiệm vụ và kiểm tra Blacklist
-    if (_0xisH) {
+    // 4. Nhận diện mã nhiệm vụ và kiểm tra Blacklist.
+    // NGOAI TRU trang cong octolink: doi navigate sang linkhuongdan truoc
+    // (document moi boc id tu URL), chua boc id/domain/manual o day.
+    if (_0xisH && !(_0x74d2.includes('octolink.vip') && !_0x83c1.has('redirect_to_octo'))) {
       if (_0x54fa) {
         logG(`Đã nhận diện mã nhiệm vụ: [${_0x54fa}]`, 'system');
         const blackToken = isCampBlacklisted(_0x54fa, _0x921a);
@@ -767,7 +769,12 @@
               try {
                 if (location.href !== _0startUrl) { try { clearInterval(_0tm); } catch (e) {} return; }
                 var _0dn = document.getElementById('gate-denied');
-                if (_0dn && _0dn.className.indexOf('hide') < 0) { try { clearInterval(_0tm); } catch (e) {} return; }
+                if (_0dn && _0dn.className.indexOf('hide') < 0) {
+                  try { clearInterval(_0tm); } catch (e) {}
+                  logG('Cổng từ chối, dùng cách cũ mở hộ...', 'system');
+                  deviceBypass(_0al);
+                  return;
+                }
               } catch (e) {}
               _0tries++;
               if (_0tries >= 12) {

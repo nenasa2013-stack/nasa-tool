@@ -4089,6 +4089,24 @@ def is_transient_nav_host(url_str):
     return any(d in lower for d in TRANSIENT_NAV_HOSTS)
 
 
+def _gate_landing_info(url_str):
+    """Nhan dien landing linkhuongdan ?qq=complete sau cong. Tra (True/False, task_id)."""
+    try:
+        u = url_str or ""
+        ul = u.lower()
+        if "linkhuongdan" not in ul or "qq=complete" not in ul:
+            return False, ""
+        m = re.search(r"/(\d+-\d+)(?:/|$|\?)", u)
+        if m:
+            return True, m.group(1)
+        m2 = re.search(r"(totreview-[^/?#]+)", ul)
+        if m2:
+            return True, m2.group(1)
+        return True, ""
+    except Exception:
+        return False, ""
+
+
 def is_money_task_finish_url(u):
     return ("moneytask.top" in u) and ("finish" in u)
 
@@ -4214,6 +4232,13 @@ def setup_cdp_interceptor(sc, page, context_obj):
             if frame.parent_frame is not None:
                 return
             final_url = frame.url or ""
+            # Qua cong: landing linkhuongdan ?qq=complete -> boc id job, tiep tuc giai
+            landed, land_id = _gate_landing_info(final_url)
+            if landed:
+                print_slot_success(sc.slot_id, f"🔓 Đã qua cổng, tới linkhuongdan"
+                                   + (f" [{land_id}]" if land_id else "") + f": {final_url[:80]}")
+                write_log_file(f"[{timestamp_now()}] [#{sc.slot_id:02d}] GATE LANDED {final_url[:120]}")
+                return
             if final_url.startswith("http") and not same_host(final_url, sc.start_url) \
                     and not is_transient_nav_host(final_url) and ("/finish/" not in final_url):
                 try:
