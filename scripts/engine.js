@@ -993,6 +993,23 @@
       return null;
     }
 
+    // Chu dong goi DeviceShield.get() de SINH fingerprint (trang cong goi ham nay
+    // mot cach tuong minh; eval xong khong ai goi thi mai khong co __creep_fp).
+    function _0ensureFp() {
+      try {
+        if (window.__creep_fp) return;
+        var _0dz = null;
+        try { _0dz = window.DeviceShield || window.CreepJS || null; } catch (e) {}
+        if (_0dz && typeof _0dz.get === 'function') {
+          try {
+            _0dz.get().then(function (_0rr) {
+              try { if (_0rr && _0rr.visitorId && !window.__creep_fp) window.__creep_fp = _0rr.visitorId; } catch (e) {}
+            }).catch(function () {});
+          } catch (e) {}
+        }
+      } catch (e) {}
+    }
+
     // Giai wrapper XOR v4.9 lay code THUC THI (nap device-shield de co __creep_fp).
     // Chi tra code khi giai duoc wrapper; plaintext tra null (giu behavior cu).
     function _0jsconfigCode(_0txt) {
@@ -1062,8 +1079,10 @@
             }
           } catch (e) {}
           // Doi fingerprint san sang (toi da ~10s) roi moi startJ
+          try { _0ensureFp(); } catch (e) {}
           var _0fpWait = 0;
           var _0fpTimer = setInterval(function () {
+            try { _0ensureFp(); } catch (e) {}
             var _0hasFp = false;
             try {
               _0hasFp = !!(window.__creep_fp || (window.directjscd && (window.directjscd.creep_visitor || window.directjscd.visitorId)));
