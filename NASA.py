@@ -4963,12 +4963,10 @@ class JobRunner:
         orig_input = raw_input
         remember_octo_link(raw_input)
 
-        # 0. Cong Octolink: TRINH DUYET tu qua (khong resolve bang requests nua).
-        # TrafficVIP giu resolve cu (engine khong cover cong trafficvip).
+        # 0. Mo cong: resolve nhanh bang requests TRUOC (duong cu bat linkhuongdan),
+        # rot thi trinh duyet tu qua (engine cho trang submit + fallback POST).
         gate_cookies = ""
-        if ("octolink.vip" in raw_input):
-            print_slot_info(slot_id, "Trình duyệt tự qua cổng Octolink (không resolve trước)...")
-        if ("trafficvip" in raw_input) and ("octolink.vip" not in raw_input):
+        if ("octolink.vip" in raw_input) or ("trafficvip" in raw_input):
             gate_info = resolve_gate_url(raw_input, proxy_url, slot_id)
             if gate_info["resolved_url"] and gate_info["resolved_url"] != raw_input:
                 print_slot_success(slot_id, f"🔓 Đã tự động mở cổng thiết bị Octolink: {raw_input} -> {gate_info['resolved_url']}")
