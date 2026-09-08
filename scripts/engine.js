@@ -1082,7 +1082,14 @@
                     if (_0kv) _0ckn.push(_0kv);
                   }
                 } catch (e) {}
+                var _0ds = 'no', _0dst = 0;
+                try { _0ds = (typeof DeviceShield !== 'undefined') ? 'yes' : 'no'; } catch (e) {}
+                try {
+                  var _0ss = document.querySelectorAll('script[src*="device-shield"]');
+                  _0dst = _0ss ? _0ss.length : 0;
+                } catch (e) {}
                 console.log('[OCTO_PANEL] system | cookies: ' + _0ckn.join(','));
+                console.log('[OCTO_PANEL] system | shield: DeviceShield=' + _0ds + ' scriptTags=' + _0dst);
               } catch (_de) {}
               let _0xclnu = _0xud.replace(/https?:\/\//i, '').replace(/\/$/, '');
               if (_0xsrc === 'manual') { syncGit(_0x54fa, _0xclnu); let _0xiel = document.getElementById('manual-input-container'); if (_0xiel) _0xiel.style.display = 'none'; }

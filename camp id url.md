@@ -170,7 +170,7 @@
 
 157-2|https://g-rafo.co.in
 
-155-2|https://ablpoker.cyou
+155-2|https://uu88.studio
 
 154-2|https://iplaysport.in
 

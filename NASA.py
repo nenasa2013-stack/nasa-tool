@@ -4404,6 +4404,21 @@ def setup_cdp_interceptor(sc, page, context_obj):
                         context_obj.add_cookies([{"name": "from_google", "value": "true", "url": "https://octolink.vip"}])
                     except Exception:
                         pass
+                    # Diag: ten Set-Cookie THAT (gom ca HttpOnly nhu dvid) cua gate/jsconfig
+                    try:
+                        if ("/check/device" in url_str) or ("jsconfig" in url_str):
+                            _names = []
+                            for _h in set_cookies:
+                                _n = _h.split(";")[0].strip().split("=")[0].strip()
+                                if _n and _n not in _names:
+                                    _names.append(_n)
+                            try:
+                                _st = resp.status
+                            except Exception:
+                                _st = "?"
+                            print_slot_info(sc.slot_id, f"🍪 RESP [{_st}] {url_str[:60]} cookies: {','.join(_names) or '-'}")
+                    except Exception:
+                        pass
             except Exception:
                 pass
             if ("octolink.vip" not in url_str) and ("trafficvip.vip" not in url_str) and ("/check/" not in url_str):
