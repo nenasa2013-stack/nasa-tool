@@ -3977,8 +3977,9 @@ def resolve_gate_url(raw_input, proxy_url="", slot_id=0):
     sess.proxies = proxies or {}
 
     try:
+        # Co che CU: UA co dinh GATE_UA (khong xoay theo slot de server nhan dien on dinh)
         r1 = sess.get(raw_input, timeout=15, headers={
-            "User-Agent": ua_for_slot(slot_id),
+            "User-Agent": GATE_UA,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         })
         try:
@@ -3991,7 +3992,7 @@ def resolve_gate_url(raw_input, proxy_url="", slot_id=0):
             "Content-Type": "application/x-www-form-urlencoded",
             "Origin": f"{scheme}://{u.netloc}",
             "Referer": raw_input,
-            "User-Agent": ua_for_slot(slot_id),
+            "User-Agent": GATE_UA,
             "Accept": "application/json, text/javascript, */*; q=0.01",
         })
         result = r2.json()
