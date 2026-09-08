@@ -2280,6 +2280,27 @@ def get_domain_from_money_task(task_key):
     return "", False
 
 
+def _alias_to_camp_id(alias):
+    """Noi alias octo (XtQr) -> camp id (140-2) qua GitHub redirects. Tra camp id hoac ''."""
+    a = (alias or "").strip()
+    if not a:
+        return ""
+    try:
+        cache = fetch_github_domain_cache()
+    except Exception:
+        return ""
+    for k, v in ((cache or {}).items()):
+        try:
+            if str(k).strip().lower() == a.lower():
+                vv = str(v or "").strip()
+                if is_strict_task_key(vv):
+                    return vv
+                return ""
+        except Exception:
+            continue
+    return ""
+
+
 def get_domain_from_github_cache(task_key):
     task_key = (task_key or "").strip()
     if not task_key:
@@ -4923,6 +4944,13 @@ class JobRunner:
             task_key = ""
         if not task_key and alias and is_strict_task_key(alias):
             task_key = alias
+        # 1b. Noi alias octo -> camp id qua GitHub redirects (vd XtQr -> 140-2)
+        # roi tra domain tu file local nhu thuong
+        if not task_key and alias:
+            _camp = _alias_to_camp_id(alias)
+            if _camp:
+                task_key = _camp
+                print_slot_info(slot_id, f"🔗 Alias [{alias}] -> camp [{task_key}] (GitHub redirects)")
 
         # 2. Blacklist (dinh blacklist thi lay lai link octo vua dan lam lai 5 lan, het thi xoay proxy)
         blacklisted, black_token = is_campaign_blacklisted(task_key, raw_input)

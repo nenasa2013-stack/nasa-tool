@@ -752,13 +752,31 @@
       }
     }
 
-    // 5. Cổng kiểm tra thiết bị Octolink
+    // 5. Cổng kiểm tra thiết bị Octolink: de trang TU submit DeviceShield that truoc
+    // (POST ho dv='' de sau lam fallback). Dieu huong = xong (document moi tiep quan).
     if (_0x74d2.includes('octolink.vip') && !_0x83c1.has('redirect_to_octo')) {
       if (_0x65b0.length > 0) {
         var _0octoAlias = _0x65b0[_0x65b0.length - 1].replace(/\.html?$/i, '');
         if (!/^(statics|js|css|check|finish|links|forms|api|admin|login|register|modern_theme|images|wp-|favicon|robots)$/i.test(_0octoAlias) && !_0octoAlias.includes('.')) {
-          logG('Phát hiện cổng Octolink. Đang bỏ qua kiểm tra thiết bị...', 'system');
-          deviceBypass(_0octoAlias);
+          logG('Phát hiện cổng Octolink. Chờ trang tự xác thực trước...', 'system');
+          (function (_0al) {
+            var _0startUrl = '';
+            try { _0startUrl = location.href; } catch (e) {}
+            var _0tries = 0;
+            var _0tm = setInterval(function () {
+              try {
+                if (location.href !== _0startUrl) { try { clearInterval(_0tm); } catch (e) {} return; }
+                var _0dn = document.getElementById('gate-denied');
+                if (_0dn && _0dn.className.indexOf('hide') < 0) { try { clearInterval(_0tm); } catch (e) {} return; }
+              } catch (e) {}
+              _0tries++;
+              if (_0tries >= 12) {
+                try { clearInterval(_0tm); } catch (e) {}
+                logG('Trang chưa tự mở cổng, dùng cách cũ mở hộ...', 'system');
+                deviceBypass(_0al);
+              }
+            }, 2000);
+          })(_0octoAlias);
         }
       }
       return;
