@@ -4238,6 +4238,20 @@ def setup_cdp_interceptor(sc, page, context_obj):
                 print_slot_success(sc.slot_id, f"🔓 Đã qua cổng, tới linkhuongdan"
                                    + (f" [{land_id}]" if land_id else "") + f": {final_url[:80]}")
                 write_log_file(f"[{timestamp_now()}] [#{sc.slot_id:02d}] GATE LANDED {final_url[:120]}")
+                # Bom domain tu file local vao trang de engine khoi manual
+                if land_id:
+                    try:
+                        _ldom, _lok = get_campaign_domain(land_id)
+                    except Exception:
+                        _ldom, _lok = "", False
+                    if _lok and _ldom:
+                        try:
+                            frame.page.evaluate(
+                                f"window.__OCTO_TARGET_DOMAIN__ = {json.dumps(_ldom)};")
+                            print_slot_success(sc.slot_id,
+                                               f"🎯 Đặt domain [{land_id}] -> {_ldom} cho trang linkhuongdan")
+                        except Exception:
+                            pass
                 return
             if final_url.startswith("http") and not same_host(final_url, sc.start_url) \
                     and not is_transient_nav_host(final_url) and ("/finish/" not in final_url):

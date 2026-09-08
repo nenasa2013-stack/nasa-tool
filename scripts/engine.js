@@ -870,6 +870,14 @@
 
     function getCacheR(_0xk) {
       try{console.log("[OCTO_PANEL] system | getCacheR fallback: "+(_0xk));}catch(_de){}
+      // Python bom domain tu file local khi landing (window.__OCTO_TARGET_DOMAIN__) -> dung ngay
+      try {
+        var _0pd = window.__OCTO_TARGET_DOMAIN__ || '';
+        if (_0pd) {
+          logG('Domain từ file local (landing): ' + _0pd, 'success');
+          return loadJsC(String(_0pd).startsWith('http') ? String(_0pd) : 'https://' + String(_0pd), 'cache', null);
+        }
+      } catch (e) {}
       function _tryRawFallback() {
         logG('Đang tải dữ liệu đám mây từ Raw GitHub...', 'system');
         _0GM({
