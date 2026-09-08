@@ -4325,32 +4325,12 @@ def setup_cdp_interceptor(sc, page, context_obj):
                             print_slot_info(sc.slot_id, f"⚡ {log_msg}")
 
                     if log_msg.startswith("REDIRECT_TO_OCTO_SUCCESS: "):
+                        # Y duc 5.5: ENGINE tu di trang trung gian + meta/anchor sang finish.
+                        # Python KHONG dieu huong nua (tranh dua 2 duong) - chi log.
                         dest_url = log_msg.replace("REDIRECT_TO_OCTO_SUCCESS: ", "").strip()
                         if dest_url:
-                            if is_transient_nav_host(dest_url) or ("/finish/" in dest_url):
-                                # lay link redirect roi di tiep toi finish nhu ban 5.3/5.5
-                                try:
-                                    base = getattr(sc, "target_domain", "") or ""
-                                    if base and dest_url and "/finish/" in dest_url:
-                                        from urllib.parse import quote as _q
-                                        redirect_url = base.rstrip("/") + "/?redirect_to_octo=" + _q(dest_url, safe="")
-                                        print_slot_success(sc.slot_id, f"REDIRECT_TO_OCTO: {redirect_url}")
-                                        write_log_file(f"[{timestamp_now()}] [#{sc.slot_id:02d}] REDIRECT {redirect_url} (finish: {dest_url})")
-                                        sc.nav.put_nowait(redirect_url)
-                                    else:
-                                        print_slot_success(sc.slot_id, f"REDIRECT_TO_OCTO: {dest_url}")
-                                        write_log_file(f"[{timestamp_now()}] [#{sc.slot_id:02d}] REDIRECT {dest_url}")
-                                        sc.nav.put_nowait(dest_url)
-                                except Exception:
-                                    try:
-                                        sc.nav.put_nowait(dest_url)
-                                    except Exception:
-                                        pass
-                            else:
-                                try:
-                                    sc.results.put_nowait(SolverResult(dest_url, False))
-                                except Exception:
-                                    pass
+                            print_slot_info(sc.slot_id, f"➡️ Engine qua trang trung gian tới finish: {dest_url[:80]}...")
+                            write_log_file(f"[{timestamp_now()}] [#{sc.slot_id:02d}] REDIRECT engine-driven (finish: {dest_url[:120]})")
                     # bat wait tu log "Bắt đầu chặng X (chờ Ns)." de dem dung cho moi chang
                     if "Bắt đầu chặng" in log_msg and "chờ" in log_msg:
                         try:

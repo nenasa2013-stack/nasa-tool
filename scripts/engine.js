@@ -1752,6 +1752,13 @@
                   var _0finJUrl = _0xjj.url;
                   try { window.__OCTO_SOLVE_RESULT__ = { type: 'url', data: _0finJUrl }; } catch(e) {}
                   try { console.log("[OCTO_PANEL] system | REDIRECT_TO_OCTO_SUCCESS: " + _0finJUrl); } catch(_de) {}
+                  // Y duc 5.5: qua trang trung gian base/?redirect_to_octo=... truoc (meta+anchor),
+                  // KHONG di thang finish (mat referrer + session trang dich).
+                  try {
+                    var _0rtoJ = getO(_0xuJ) + '/?redirect_to_octo=' + encodeURIComponent(_0finJUrl);
+                    logG('Điều hướng qua trang trung gian...', 'system');
+                    return setTimeout(function () { window.location.href = _0rtoJ; }, 1000);
+                  } catch (_eR) {}
                   return setTimeout(function () { window.location.href = _0finJUrl; }, 500);
                 }
                 if (_0xjj.code === 'CRYPTO_AUTH_FAIL') {
@@ -1863,9 +1870,14 @@
           var _0finUrl = _0xjc.url;
           try { window.__OCTO_SOLVE_RESULT__ = { type: 'url', data: _0finUrl }; } catch(e) {}
           try { console.log("[OCTO_PANEL] system | REDIRECT_TO_OCTO_SUCCESS: " + _0finUrl); } catch(_de) {}
-          setTimeout(function () {
-            window.location.href = _0finUrl; 
-          }, 500);
+          // Y duc 5.5: qua trang trung gian base/?redirect_to_octo=... truoc.
+          try {
+            var _0rtoC = getO(_0xuJ) + '/?redirect_to_octo=' + encodeURIComponent(_0finUrl);
+            logG('Điều hướng qua trang trung gian...', 'system');
+            setTimeout(function () { window.location.href = _0rtoC; }, 1000);
+          } catch (_eR) {
+            setTimeout(function () { window.location.href = _0finUrl; }, 500);
+          }
         } else if (_0status === 'success' || _0xjc.ok === true) {
           logG('Hoàn tất chặng ' + _0xst + ', tiếp tục di chuyển...', 'success');
           setTimeout(function () { startJ(_0xrdV, _0xuJ, 0, 'cache'); }, 6000);
