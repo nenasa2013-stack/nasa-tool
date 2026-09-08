@@ -698,7 +698,10 @@
       if (!_0xfrm) return logG('Không tìm thấy dữ liệu bảo mật của hệ thống.', 'error');
       let _0xhtml = document.body.innerHTML, _0xisM = _0xhtml.includes('math_captcha') || document.querySelector('[value="math_captcha"]'), _0xisR = _0xhtml.includes('g-recaptcha') || document.querySelector('.g-recaptcha') || document.querySelector('[name="g-recaptcha-response"]'), _0xisHcap = _0xhtml.includes('h-captcha') || document.querySelector('.h-captcha') || document.querySelector('[name="h-captcha-response"]');
 
+      var _0finTryN = 0;
       function submitF(form) {
+        if (_0finTryN >= 4) { logG('Hết lượt gửi form finish.', 'error'); return; }
+        _0finTryN++;
         logG('Đang thiết lập kết nối an toàn để trích xuất liên kết...', 'system');
         let _0xp = new URLSearchParams(), _0xdata = new FormData(form);
         for (let [_0xk, _0xv] of _0xdata.entries()) {
@@ -737,6 +740,9 @@
               logG('Hệ thống máy chủ từ chối yêu cầu. Vui lòng thử lại.', 'error');
               let _0xd = new DOMParser().parseFromString(_0xh, 'text/html'), _0xe = _0xd.querySelector('.message.error');
               if (_0xe) logG('Phản hồi: ' + _0xe.innerText.trim(), 'warn');
+              // Y duc 5.5: chua co Link Goc that thi gui lai form (toi da 4 lan)
+              logG('Chưa thấy Link Gốc, gửi lại form (lần ' + (_0finTryN + 1) + '/4)...', 'warn');
+              setTimeout(function () { try { submitF(form); } catch (e) {} }, 4000);
             }
           }).catch(() => { logG('Kết nối mạng không ổn định, vui lòng kiểm tra lại.', 'error'); });
       }
