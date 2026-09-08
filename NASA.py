@@ -2122,7 +2122,48 @@ def money_task_bearer():
                 return s
     except Exception:
         pass
+    # Fallback: JWT token= trong moneytask_cookie.txt user da dan (het han thi bo).
+    # Can thiet vi GitHub nasanoper da chet 404 - MT API la nguon camp song duy nhat.
+    try:
+        c = _mt_load_cookie()
+        for part in (c or "").split(";"):
+            part = part.strip()
+            if not part or "=" not in part:
+                continue
+            k, vv = part.split("=", 1)
+            if k.strip().lower() == "token" and vv.strip():
+                exp = _mt_jwt_exp(c)
+                if exp and exp < time.time():
+                    break
+                return "Bearer " + vv.strip()
+    except Exception:
+        pass
     return defaultMoneyTaskBearer
+
+
+def _domain_from_moneytask_alias(alias):
+    """Tra domain truc tiep tu alias octo (XtQr) qua guild_link MoneyTask. Tra domain hoac ''."""
+    a = (alias or "").strip().lower()
+    if not a:
+        return ""
+    try:
+        camps = fetch_money_task_campaigns()
+    except Exception:
+        return ""
+    for c in camps or []:
+        try:
+            gl = (c.get("guild_link") or "").strip()
+            if not gl:
+                continue
+            if urlparse(gl).path.strip("/").lower() == a:
+                web_url = (c.get("website_url") or "").strip()
+                if web_url and web_url.lower() != "n/a" and not is_system_domain(web_url):
+                    if not web_url.startswith("http://") and not web_url.startswith("https://"):
+                        web_url = "https://" + web_url
+                    return web_url.rstrip("/")
+        except Exception:
+            continue
+    return ""
 
 
 def _campaign_file_path():
@@ -4922,9 +4963,12 @@ class JobRunner:
         orig_input = raw_input
         remember_octo_link(raw_input)
 
-        # 0. Tu dong mo cong Octolink/TrafficVIP qua /check/device
+        # 0. Cong Octolink: TRINH DUYET tu qua (khong resolve bang requests nua).
+        # TrafficVIP giu resolve cu (engine khong cover cong trafficvip).
         gate_cookies = ""
-        if ("octolink.vip" in raw_input) or ("trafficvip" in raw_input):
+        if ("octolink.vip" in raw_input):
+            print_slot_info(slot_id, "Trình duyệt tự qua cổng Octolink (không resolve trước)...")
+        if ("trafficvip" in raw_input) and ("octolink.vip" not in raw_input):
             gate_info = resolve_gate_url(raw_input, proxy_url, slot_id)
             if gate_info["resolved_url"] and gate_info["resolved_url"] != raw_input:
                 print_slot_success(slot_id, f"🔓 Đã tự động mở cổng thiết bị Octolink: {raw_input} -> {gate_info['resolved_url']}")
@@ -4982,6 +5026,12 @@ class JobRunner:
             if ok and dom:
                 target_domain = dom
                 print_slot_success(slot_id, f"🎯 Đã tra cứu domain chiến dịch: [{task_key}] -> {target_domain}")
+        # 3b. Chua co domain ma co alias octo -> tra thang qua guild_link MoneyTask
+        if not target_domain and alias:
+            domA = _domain_from_moneytask_alias(alias)
+            if domA:
+                target_domain = domA
+                print_slot_success(slot_id, f"🎯 Alias [{alias}] -> domain MoneyTask: {target_domain}")
 
         # 3.1 Tu dong phat hien redirect (nhap vao chrome ra url khac) -> cap nhat
         if target_domain:
